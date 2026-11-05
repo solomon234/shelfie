@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { lazy, Suspense } from "preact/compat";
+import { CATEGORIES, CATEGORY_INFO, isCategory, type Category } from "../../src/shared/categories.ts";
 import { localParts } from "../../src/shared/dates.ts";
-import { ApiError, api } from "./api.ts";
+import { ApiError, api, store } from "./api.ts";
 import type { Lot } from "./overlay.ts";
 import { disablePush, enablePush, pushState, sendTestPush, type PushState } from "./push.ts";
 import {
@@ -13,6 +14,10 @@ const Scanner = lazy(() => import("./scanner.tsx"));
 
 const UNITS = ["item", "can", "bottle", "box", "bag", "pack", "jar", "lb", "oz", "kg", "g", "L", "ml"];
 const val = (e: Event) => (e.target as HTMLInputElement).value;
+
+const catOf = (l: { category?: string }): Category => (isCategory(l.category) ? l.category : "food");
+// Non-food categories are named in the row so a headlamp is not mistaken for a snack.
+const catTag = (l: { category?: string }) => (catOf(l) === "food" ? "" : `${CATEGORY_INFO[catOf(l)].label} · `);
 
 function expiryBadge(days: number | null, warn: number) {
   if (days === null) return <span class="badge none">No date</span>;
@@ -92,7 +97,7 @@ function TzList() {
   return <datalist id="tzs">{zones.map((z) => <option value={z} />)}</datalist>;
 }
 
-type View = { name: "tab" } | { name: "scan" } | { name: "add"; barcode: string | null; prefill?: { name?: string; brand?: string; image_url?: string }; offline?: boolean };
+type View = { name: "tab" } | { name: "scan" } | { name: "add"; barcode: string | null; prefill?: { name?: string; brand?: string; image_url?: string; category?: Category }; offline?: boolean };
 
 function Shell() {
   const s = useApp();
@@ -176,7 +181,7 @@ function Home({ onScan }: { onScan(): void }) {
         {sum.expiring.length === 0 && <p class="muted">Nothing expiring in the next 14 days.</p>}
         {sum.expiring.map(({ l, d }) => (
           <div class="row">
-            <div><strong>{l.name}</strong><small>{l.location_name} · {fmtQty(l)}</small></div>
+            <div><strong>{l.name}</strong><small>{catTag(l)}{l.location_name} · {fmtQty(l)}</small></div>
             {expiryBadge(d, h?.expiry_warning_days ?? 3)}
           </div>
         ))}
@@ -192,9 +197,10 @@ function Inventory({ onScan }: { onScan(): void }) {
   const s = useApp();
   const h = household(s);
   const [loc, setLoc] = useState("");
+  const [cat, setCat] = useState("");
   const [q, setQ] = useState("");
   const [open, setOpen] = useState<string | number | null>(null);
-  const all = lots(s).filter((l) => (!loc || String(l.location_id) === loc) && (!q || `${l.name} ${l.brand ?? ""}`.toLowerCase().includes(q.toLowerCase())));
+  const all = lots(s).filter((l) => (!loc || String(l.location_id) === loc) && (!cat || catOf(l) === cat) && (!q || `${l.name} ${l.brand ?? ""}`.toLowerCase().includes(q.toLowerCase())));
   const target = (l: Lot) => (typeof l.id === "number" ? { lot_id: l.id } : { lot_client_id: l.client_id });
   const online = (fn: () => Promise<unknown>) => async () => {
     try {
@@ -212,6 +218,10 @@ function Inventory({ onScan }: { onScan(): void }) {
           <option value="">All locations</option>
           {s.locations.map((x) => <option value={x.id}>{x.name}</option>)}
         </select>
+        <select aria-label="Category" value={cat} onChange={(e) => setCat(val(e))}>
+          <option value="">All categories</option>
+          {CATEGORIES.map((c) => <option value={c}>{CATEGORY_INFO[c].label}</option>)}
+        </select>
       </div>
       {all.length === 0 && (
         <p class="muted center">Nothing here yet. <button class="link" onClick={onScan}>Scan an item</button></p>
@@ -222,14 +232,14 @@ function Inventory({ onScan }: { onScan(): void }) {
             <button class="row tap" onClick={() => setOpen(open === l.id ? null : l.id)} aria-expanded={open === l.id}>
               <div>
                 <strong>{l.name}{l.pending && <i class="dot" title="Not synced yet" />}</strong>
-                <small>{l.resolved ? l.brand ?? "" : "Unidentified until synced"}{l.brand && l.resolved ? " · " : ""}{l.location_name} · {fmtQty(l)}</small>
+                <small>{catTag(l)}{l.resolved ? l.brand ?? "" : "Unidentified until synced"}{l.brand && l.resolved ? " · " : ""}{l.location_name} · {fmtQty(l)}</small>
               </div>
               {expiryBadge(daysLeft(l.expires_on, h), h?.expiry_warning_days ?? 3)}
             </button>
             {open === l.id && (
               <div class="actions">
-                <button onClick={() => void enqueue("lot.consume", { ...target(l), amount: 1, label: l.name })}>Use 1</button>
-                <button onClick={() => void enqueue("lot.consume", { ...target(l), amount: l.quantity, label: l.name })}>Use all</button>
+                <button onClick={() => void enqueue("lot.consume", { ...target(l), amount: 1, label: l.name })}>{CATEGORY_INFO[catOf(l)].consumable ? "Use 1" : "Retire 1"}</button>
+                <button onClick={() => void enqueue("lot.consume", { ...target(l), amount: l.quantity, label: l.name })}>{CATEGORY_INFO[catOf(l)].consumable ? "Use all" : "Retire all"}</button>
                 <select aria-label="Move to" value="" onChange={(e) => val(e) && void enqueue("lot.move", { ...target(l), location_id: Number(val(e)), label: l.name })}>
                   <option value="">Move to…</option>
                   {s.locations.filter((x) => x.id !== l.location_id).map((x) => <option value={x.id}>{x.name}</option>)}
@@ -290,13 +300,15 @@ function ScanScreen({ onClose, onResult }: { onClose(): void; onResult(v: Extrac
     try {
       const code = raw.replace(/\D/g, "");
       try {
-        const p = await api<{ found: boolean; barcode: string; name?: string; brand?: string; image_url?: string }>(`/api/products/${code}`);
+        const p = await api<{ found: boolean; barcode: string; name?: string; brand?: string; image_url?: string; category?: Category }>(`/api/products/${code}`);
         onResult({ name: "add", barcode: p.barcode, prefill: p.found ? p : undefined });
       } catch (e) {
         if (e instanceof ApiError) return toast(e.message);
         // Offline: use a name we already know for this barcode, else the server names it after syncing.
-        const known = s.names[code.length === 12 ? "0" + code : code];
-        onResult({ name: "add", barcode: code.length === 12 ? "0" + code : code, prefill: known ? { name: known } : undefined, offline: true });
+        const norm = code.length === 12 ? "0" + code : code;
+        const known = s.names[norm];
+        const knownCat = s.categories[norm];
+        onResult({ name: "add", barcode: norm, prefill: known ? { name: known, category: isCategory(knownCat) ? knownCat : undefined } : undefined, offline: true });
       }
     } finally {
       setBusy(false);
@@ -334,6 +346,12 @@ function AddLot({ view, onClose, onAnother }: { view: Extract<View, { name: "add
   const [loc, setLoc] = useState(String(s.locations[0]?.id ?? ""));
   const [exp, setExp] = useState("");
   const [notes, setNotes] = useState("");
+  const [category, setCategory] = useState<Category>(view.prefill?.category ?? "food");
+  // With no known category, start from the last one used (a preparedness run adds many gear items in a row).
+  useEffect(() => {
+    if (!view.prefill?.category) void store.kvGet<string>("lastCategory").then((c) => isCategory(c) && setCategory(c));
+  }, []);
+  const info = CATEGORY_INFO[category];
   const needsName = !view.barcode && !name.trim();
   const unknownOffline = view.barcode && !view.prefill?.name;
 
@@ -350,10 +368,12 @@ function AddLot({ view, onClose, onAnother }: { view: Extract<View, { name: "add
       image_url: view.prefill?.image_url,
       quantity,
       unit,
+      category,
       expires_on: exp || undefined,
       notes: notes.trim() || undefined,
       label,
     });
+    void store.kvSet("lastCategory", category);
     toast(`Added ${label}`);
     another ? onAnother() : onClose();
   }
@@ -367,6 +387,11 @@ function AddLot({ view, onClose, onAnother }: { view: Extract<View, { name: "add
         {unknownOffline && (
           <p class="hint">{view.offline ? "You are offline, so the product name will be filled in after syncing." : "Product not found. Enter a name, or leave it blank to try again later."}</p>
         )}
+        <div class="chips" role="radiogroup" aria-label="Category">
+          {CATEGORIES.map((c) => (
+            <button type="button" role="radio" aria-checked={category === c} class={`chip ${category === c ? "on" : ""}`} onClick={() => setCategory(c)}>{CATEGORY_INFO[c].label}</button>
+          ))}
+        </div>
         <label>Name{!view.barcode && " *"}<input value={name} onInput={(e) => setName(val(e))} required={needsName} placeholder={view.barcode ? "Optional" : "e.g. Apples"} /></label>
         <label>Brand<input value={brand} onInput={(e) => setBrand(val(e))} /></label>
         <div class="two">
@@ -374,11 +399,11 @@ function AddLot({ view, onClose, onAnother }: { view: Extract<View, { name: "add
           <label>Unit<select value={unit} onChange={(e) => setUnit(val(e))}>{UNITS.map((u) => <option>{u}</option>)}</select></label>
         </div>
         <label>Location<select value={loc} onChange={(e) => setLoc(val(e))}>{s.locations.map((x) => <option value={x.id}>{x.name}</option>)}</select></label>
-        <label>Best before
+        <label>{info.dateLabel}
           <input type="date" value={exp} onInput={(e) => setExp(val(e))} />
         </label>
         <div class="chips">
-          {[["+3d", 3], ["+1w", 7], ["+2w", 14], ["+1m", 30], ["+6m", 182]].map(([t, d]) => (
+          {info.presets.map(([t, d]) => (
             <button type="button" class="chip" onClick={() => setExp(addDays(d as number, h?.timezone ?? "UTC"))}>{t}</button>
           ))}
           <button type="button" class="chip" onClick={() => setExp("")}>None</button>

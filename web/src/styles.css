@@ -54,10 +54,12 @@ nav button.active { color: var(--brand); font-weight: 600; }
 .badge { padding: 4px 10px; border-radius: 999px; font-size: .78rem; font-weight: 600; white-space: nowrap; }
 .badge.ok { background: var(--ok-bg); color: var(--ok); } .badge.warn { background: var(--warn-bg); color: var(--warn); } .badge.bad { background: var(--bad-bg); color: var(--bad); } .badge.none { background: var(--line); color: var(--muted); }
 .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--warn); margin-left: 6px; }
-.filters, .inline { display: flex; gap: 8px; } .filters select { width: 45%; }
+.filters, .inline { display: flex; gap: 8px; }
+.filters { flex-wrap: wrap; } .filters input { flex: 1 1 100%; } .filters select { flex: 1 1 40%; width: auto; }
 .check { width: 32px; min-height: 32px; height: 32px; padding: 0; border-radius: 50%; }
 .stack { display: grid; gap: 12px; } .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; } .chip { min-height: 36px; padding: 0 12px; border-radius: 999px; }
+.chip.on { background: var(--brand); color: var(--brand-text); border-color: transparent; font-weight: 600; }
 .buttons { display: flex; flex-wrap: wrap; gap: 8px; }
 .thumb { width: 96px; height: 96px; object-fit: contain; border-radius: 12px; background: #fff; border: 1px solid var(--line); justify-self: center; }
 .scanner video { width: 100%; max-height: 50dvh; background: #000; border-radius: var(--radius); object-fit: cover; } .scanner p { margin: 6px 0 0; font-size: .9rem; }

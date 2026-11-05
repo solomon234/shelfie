@@ -15,7 +15,7 @@ sources: []
 
 ## Why
 
-A vision to realize, driven by a pain: the owner's household throws away food because nothing nudges them before it expires, and capturing groceries at the store fails without signal. Surveyed self-hosted pantry apps (GhostPantry, Pantry Host, Grocy, EverShelf, Pantrie) were not confirmed to combine per-package expiry, proactive alerts and offline capture with sync. Shelfie is a public, MIT, self-hosted PWA that does all three on a home server (a Jetson) with minimal operations.
+A vision to realize, driven by a pain: the owner's household throws away food because nothing nudges them before it expires, and capturing groceries at the store fails without signal. Surveyed self-hosted pantry apps (GhostPantry, Pantry Host, Grocy, EverShelf, Pantrie) were not confirmed to combine per-package expiry, proactive alerts and offline capture with sync. Shelfie is a public, MIT, self-hosted PWA that does all three on a home server (a Jetson) with minimal operations. The same model covers disaster preparedness: emergency water and food, medicine, batteries, filters and safety gear all have a place, a quantity and a date after which they must be replaced, and a household that prepares needs to know what is stale and what is short.
 
 ## Capabilities
 
@@ -43,6 +43,15 @@ A vision to realize, driven by a pain: the owner's household throws away food be
 - **CAP-8**
   - **intent:** An operator can run Shelfie as one container with one database file, upgrade it without losing data, and back it up consistently.
   - **success:** `docker run` of the published image on amd64 and arm64 serves `/api/health`; opening a database from an older schema version migrates it without data loss; a backup taken while running restores to a database passing `PRAGMA integrity_check`.
+- **CAP-9**
+  - **intent:** A member can classify what they track as food, medicine, gear or household supplies, so emergency and safety supplies are tracked with the same places, dates and alerts as food.
+  - **success:** A lot added as Gear shows its date as "Replace by", appears under a Gear filter, offers Retire instead of Use, and alerts like any other lot; the category belongs to the product, so the next scan or add of the same item pre-selects it; adding offline keeps the chosen category.
+- **CAP-10** *(specified, not yet built)*
+  - **intent:** A member can give an item a repeat interval (for example a water filter every 6 months or an extinguisher inspection every year) and mark it done to get the next due date automatically.
+  - **success:** Marking a lot with a 6-month interval as done on 2026-11-05 moves its date to 2027-05-05 and restarts its alert cycle; the action works offline and replays exactly once.
+- **CAP-11** *(specified, not yet built)*
+  - **intent:** A member can set a target quantity for an item (for example 14 liters of water) and see the shortfall, so what is missing is as visible as what is stale.
+  - **success:** An item below its target is listed with the amount short, and can be added to the shopping list in one action; expired lots do not count toward the target.
 
 ## Constraints
 
@@ -54,6 +63,7 @@ A vision to realize, driven by a pain: the owner's household throws away food be
 - Dates are ISO `YYYY-MM-DD` enforced by `CHECK`; timestamps are one ISO-8601 UTC format so string comparison stays valid.
 - Barcodes are normalized to EAN-13 form before lookup and as the unique key. A lot with no barcode matches or creates a product by case-insensitive name.
 - Roles: members add, consume, move and edit lots and use the shopping list; owners additionally manage users, the warning window and alert targets; instance admins create households. Permission checks live in one place.
+- The category belongs to the product, not the lot, and is one of `food`, `medicine`, `gear`, `household`. Gear means emergency and safety supplies (water storage and filters, flashlights, radios, batteries, first-aid kits, fire extinguishers), not recreational equipment.
 - An alert fires once per lot per state transition (enters the warning window, becomes expired), recorded in `alert_state` so it is not repeated.
 - Unknown `/api/*` returns JSON 404, never the SPA shell; the unauthenticated surface is limited to health, setup and login.
 - The camera needs HTTPS; the deployment provides it (Tailscale serve or reverse proxy).
@@ -71,6 +81,7 @@ A vision to realize, driven by a pain: the owner's household throws away food be
 - Hosted multi-tenant SaaS.
 - Repeat or daily reminder alerts (an alert fires once per lot per state transition).
 - Data export in JSON or CSV (a SQLite backup is the v1 portability story).
+- General home inventory: receipts, warranties, serial numbers, photos, lending, depreciation, and recreational gear. If an item has no date, quantity or place worth tracking, it does not belong here.
 
 ## Success signal
 
@@ -78,6 +89,8 @@ On a phone with the app installed and airplane mode on, the owner scans three it
 
 ## Assumptions
 
+- CAP-10 and CAP-11 are specified but not built; they are stories 12 and 13. Categories (CAP-9) ship first.
+- Four fixed categories are enough for v1; user-defined categories are not needed until a real item does not fit.
 - Open Food Facts is the only product source, called server-side with a descriptive User-Agent; offline scans queue the raw barcode.
 - Each household sets its own timezone and alert time of day (user-confirmed); it drives expiry day boundaries and when alerts send. Defaults, if unset, are the server's `TZ` and 08:00 (assumed).
 - Companion details are proposed design, not user-confirmed: the `POST /api/sync` batch endpoint, `alert_state` table, per-household `timezone` and `alert_hour` columns, UUID v4 client ids, hashed session tokens, rate limits and body-size limits.

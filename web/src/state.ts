@@ -37,6 +37,7 @@ export interface AppState {
   ops: QueuedOp[];
   notices: Notice[];
   names: Record<string, string>;
+  categories: Record<string, string>;
   toast: string | null;
 }
 
@@ -54,6 +55,7 @@ let state: AppState = {
   ops: [],
   notices: [],
   names: {},
+  categories: {},
   toast: null,
 };
 const listeners = new Set<() => void>();
@@ -95,7 +97,11 @@ async function loadHousehold(): Promise<void> {
     cachedGet<ShoppingItem[]>(`/api/households/${hid}/shopping`),
   ]);
   const names = { ...state.names };
-  for (const l of inv.data ?? []) if (l.barcode && l.resolved) names[l.barcode] = l.name;
+  const categories = { ...state.categories };
+  for (const l of inv.data ?? []) {
+    if (l.barcode && l.resolved) names[l.barcode] = l.name;
+    if (l.barcode) categories[l.barcode] = l.category ?? "food";
+  }
   set({
     locations: locs.data ?? [],
     serverLots: inv.data ?? [],
@@ -103,9 +109,13 @@ async function loadHousehold(): Promise<void> {
     stale: inv.stale || shop.stale,
     online: !(inv.stale || shop.stale),
     names,
+    categories,
     lastSynced: inv.stale ? state.lastSynced : new Date().toISOString(),
   });
-  if (!inv.stale) await store.kvSet("names", names);
+  if (!inv.stale) {
+    await store.kvSet("names", names);
+    await store.kvSet("categories", categories);
+  }
 }
 
 export async function syncNow(): Promise<void> {
@@ -139,7 +149,7 @@ export async function refresh(): Promise<void> {
 async function enter(me: Me): Promise<void> {
   const saved = Number(await store.kvGet<number>("householdId"));
   const hid = me.households.find((h) => h.id === saved)?.id ?? me.households[0]?.id ?? null;
-  set({ me, householdId: hid, phase: "ready", names: (await store.kvGet<Record<string, string>>("names")) ?? {} });
+  set({ me, householdId: hid, phase: "ready", names: (await store.kvGet<Record<string, string>>("names")) ?? {}, categories: (await store.kvGet<Record<string, string>>("categories")) ?? {} });
   await refresh();
   void import("./scanner.tsx"); // warm the scanner chunk so scanning works offline later
   void resyncPush();

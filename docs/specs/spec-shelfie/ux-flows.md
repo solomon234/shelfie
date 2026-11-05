@@ -10,8 +10,8 @@ Phone-first, one-handed use in a store or kitchen. Dark and light themes follow 
 | Sign in | Username and password. |
 | Home | Counts (items, expiring soon, expired, shopping), an "Expiring soon" list sorted by date with days-left badges, a large Scan button, a pending-sync indicator. |
 | Scan | Camera view with a manual barcode entry link; torch toggle when supported. |
-| Add lot | Product preview (name, brand, image), quantity, unit, location, expiry date, notes; date field accepts quick presets (+3d, +1w, +1m). |
-| Inventory | Filter by location; search; per-lot actions: use one, use all, edit quantity, move, add to shopping. |
+| Add lot | Product preview (name, brand, image), category chips (Food, Medicine, Gear, Household; pre-selected from the product or the last choice), quantity, unit, location, date, notes. The date label follows the category (Best before, Expires, Replace by) and so do the quick presets (food +3d to +6m; medicine and household +1m to +2y; gear +6m to +5y). |
+| Inventory | Filter by location and by category; search; a category tag on non-food rows; per-lot actions: use one, use all, edit quantity, move, add to shopping. |
 | Shopping | Add item, tick off, delete. |
 | Settings | Household name, timezone, warning window, alert hour, alert targets; users (admin). |
 | Needs attention | Outbox operations marked `invalid`, each with the reason and a fix or discard action. |

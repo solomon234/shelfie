@@ -22,6 +22,7 @@ export interface AlertItem {
   expires_on: string;
   days: number;
   location: string;
+  category: string;
 }
 
 export interface Targets {
@@ -73,7 +74,7 @@ export async function deliver(ctx: Ctx, h: { id: number; name: string }, targets
 export async function sendTest(ctx: Ctx, householdId: number): Promise<{ sent: boolean; targets: number }> {
   const h = ctx.db.prepare("SELECT * FROM households WHERE id = ?").get(householdId) as unknown as HouseholdRow;
   const t = targetsFor(ctx, h);
-  const sample: AlertItem = { lot_id: 0, name: "Test item", quantity: 1, unit: "item", expires_on: localParts(ctx.now(), h.timezone).date, days: 0, location: "Pantry" };
+  const sample: AlertItem = { lot_id: 0, name: "Test item", quantity: 1, unit: "item", expires_on: localParts(ctx.now(), h.timezone).date, days: 0, location: "Pantry", category: "food" };
   const devices = householdDevices(ctx, householdId).length;
   const sent = await deliver(ctx, h, t, [], [sample], sample.expires_on);
   return { sent, targets: Number(Boolean(t.ntfy)) + Number(Boolean(t.webhook)) + devices };
@@ -92,7 +93,7 @@ export async function runAlertCheck(ctx: Ctx): Promise<{ households: number; ale
     const cutoff = new Date(Date.parse(local.date + "T00:00:00Z") + h.expiry_warning_days * 86400_000).toISOString().slice(0, 10);
     const rows = ctx.db
       .prepare(
-        `SELECT l.id AS lot_id, p.name, l.quantity, l.unit, l.expires_on, loc.name AS location
+        `SELECT l.id AS lot_id, p.name, p.category, l.quantity, l.unit, l.expires_on, loc.name AS location
          FROM lots l JOIN products p ON p.id = l.product_id JOIN locations loc ON loc.id = l.location_id
          WHERE l.household_id = ? AND l.expires_on IS NOT NULL AND l.expires_on <= ?
          ORDER BY l.expires_on, p.name`,

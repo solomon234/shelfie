@@ -10,7 +10,7 @@ import { registerPushRoutes } from "./routes-push.ts";
 import { registerSyncRoutes } from "./routes-sync.ts";
 import { serveSpa } from "./static.ts";
 
-export const VERSION = "0.2.0";
+export const VERSION = "0.3.0";
 
 export interface AppOptions {
   // Directory of the built frontend. When omitted the app is API-only.

@@ -67,3 +67,20 @@
   description: >-
     Add an image smoke test to CI, set workflow permissions to read-only, pin actions by SHA, use
     v*.*.* release tags and a healthcheck, and verify the arm64 image starts. Covers CAP-8.
+- id: "11"
+  title: Categories - food, medicine, gear, household
+  description: >-
+    Add a category to products (migration 3), carry it through add, edit, sync and the offline overlay, and
+    make the date label, presets, filters and Use/Retire actions follow it. Covers CAP-9.
+- id: "12"
+  title: Recurring due dates
+  description: >-
+    Add a repeat interval to lots and a mark-done action that moves the date forward and restarts the
+    alert cycle, including offline replay. Covers CAP-10.
+  spec_checkpoint: true
+- id: "13"
+  title: Target quantities and shortfall
+  description: >-
+    Add per-item target quantities, show what is short, and add shortfalls to the shopping list in one
+    action. Covers CAP-11.
+  spec_checkpoint: true

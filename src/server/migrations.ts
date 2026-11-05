@@ -108,4 +108,9 @@ CREATE TABLE push_subscriptions (
 CREATE INDEX idx_push_user ON push_subscriptions(user_id);
 `;
 
-export const MIGRATIONS: readonly string[] = [V1, V2];
+// Categories: what an item is (food, medicine, gear, household). Existing products stay food.
+const V3 = `
+ALTER TABLE products ADD COLUMN category TEXT NOT NULL DEFAULT 'food' CHECK (category IN ('food','medicine','gear','household'));
+`;
+
+export const MIGRATIONS: readonly string[] = [V1, V2, V3];

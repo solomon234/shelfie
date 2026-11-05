@@ -3,7 +3,7 @@ import type { Ctx, Env } from "./context.ts";
 import { HttpError } from "./context.ts";
 import { requireAuth, roleIn } from "./auth.ts";
 import { addLot, addShopping, consumeLot, deleteShopping, moveLot, toggleShopping, type OpResult } from "./service.ts";
-import { id, isoDate, num, optNum, optStr, readBody, str } from "./validate.ts";
+import { id, isoDate, num, optCategory, optNum, optStr, readBody, str } from "./validate.ts";
 
 export const MAX_SYNC_OPS = 200;
 
@@ -33,6 +33,7 @@ async function applyOp(ctx: Ctx, hid: number, userId: number, op: Raw): Promise<
         expires_on: isoDate(op.expires_on, "expires_on"),
         purchased_on: isoDate(op.purchased_on, "purchased_on"),
         notes: optStr(op, "notes", 500),
+        category: optCategory(op),
       });
     case "lot.consume":
       return consumeLot(ctx, hid, target(op), optNum(op, "amount", { min: 0.001, max: 100000 }) ?? 1, clientId);

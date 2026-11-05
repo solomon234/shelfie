@@ -1,4 +1,5 @@
 import type { Context } from "hono";
+import { isCategory, type Category } from "../shared/categories.ts";
 import { HttpError } from "./context.ts";
 
 export async function readBody(c: Context): Promise<Record<string, unknown>> {
@@ -76,4 +77,11 @@ export function httpUrl(v: string | null, key: string): string | null {
   }
   if (u.protocol !== "http:" && u.protocol !== "https:") throw new HttpError(400, `${key} must be http or https`);
   return u.toString();
+}
+
+export function optCategory(o: Record<string, unknown>, key = "category"): Category | undefined {
+  const v = o[key];
+  if (v === undefined || v === null || v === "") return undefined;
+  if (!isCategory(v)) throw new HttpError(400, "category must be food, medicine, gear or household");
+  return v;
 }

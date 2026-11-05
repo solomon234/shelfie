@@ -180,3 +180,10 @@ test("overlay applies shopping changes", () => {
   ], 1);
   assert.deepEqual(out.map((i) => [i.name, i.checked]), [["Rice", 0], ["Eggs", 1]]);
 });
+
+test("overlay keeps the chosen category for a queued add, and treats older cached lots as food", () => {
+  const old = lot({ id: 5, name: "Cached before categories" }); // no category field
+  const out = overlayLots([old], [q("lot.add", "g1", { location_id: 1, name: "Water filter", quantity: 2, category: "gear" }), q("lot.add", "g2", { location_id: 1, name: "Plain add", quantity: 1 })], 1, locs, new Map());
+  const by = Object.fromEntries(out.map((l) => [l.name, l.category]));
+  assert.deepEqual(by, { "Cached before categories": undefined, "Water filter": "gear", "Plain add": "food" });
+});

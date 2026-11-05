@@ -10,6 +10,7 @@ export interface Lot {
   image_url: string | null;
   barcode: string | null;
   resolved: number;
+  category?: string; // absent in data cached before categories existed: treated as food
   quantity: number;
   unit: string;
   expires_on: string | null;
@@ -59,6 +60,7 @@ export function overlayLots(server: Lot[], ops: QueuedOp[], householdId: number,
         image_url: (p.image_url as string | undefined) ?? null,
         barcode,
         resolved: p.name || (barcode && knownNames.has(barcode)) ? 1 : 0,
+        category: (p.category as string | undefined) ?? "food",
         quantity: Number(p.quantity),
         unit: String(p.unit ?? "item"),
         expires_on: (p.expires_on as string | undefined) ?? null,

@@ -9,6 +9,9 @@ food goes off, and keep working at the store with no signal.
 
 - **Per-lot expiry.** Two packs of the same product keep separate dates. The home screen lists what is expired or
   about to expire.
+- **Food, medicine, gear and household supplies.** Each item has a category, so emergency and safety supplies
+  (water filters, batteries, first-aid kits, extinguishers) are tracked with the same dates and alerts as food.
+  Dates read "Best before", "Expires" or "Replace by" to match, and gear is retired rather than used up.
 - **Expiry alerts.** A daily check, at a time and timezone you choose per household, sends a push notification to
   every device that turned on notifications in Settings (Web Push from the installed app, no extra app needed), and
   optionally to [ntfy](https://ntfy.sh) or a generic webhook. Each item alerts once when it enters the warning window and once
