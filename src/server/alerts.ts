@@ -1,6 +1,6 @@
 import { resolvePendingProducts } from "./barcode.ts";
 import type { Ctx } from "./context.ts";
-import { daysBetween, localParts } from "./dates.ts";
+import { daysBetween, localParts } from "../shared/dates.ts";
 
 interface HouseholdRow {
   id: number;

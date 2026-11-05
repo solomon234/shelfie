@@ -1,7 +1,7 @@
 import type { Ctx } from "./context.ts";
 import { HttpError } from "./context.ts";
 import { resolveProduct, type ProductInput } from "./barcode.ts";
-import { daysBetween, localParts } from "./dates.ts";
+import { daysBetween, localParts } from "../shared/dates.ts";
 
 const EPS = 1e-9;
 

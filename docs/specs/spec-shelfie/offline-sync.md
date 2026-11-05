@@ -2,7 +2,7 @@
 
 ## Client state
 
-- **Read cache:** the service worker caches the app shell and `GET /api/*` responses for inventory, locations, shopping list and the session (`/api/me`) using network-first with cache fallback; the UI marks data as "last synced" when served from cache.
+- **Read cache:** the service worker caches only the app shell (so the app opens with no connection). The app itself stores each successful `GET` response (inventory, locations, shopping list, `/api/me`) in IndexedDB and falls back to it when the network is unreachable; the UI shows "last synced" when serving cached data.
 - **Outbox (IndexedDB):** an ordered list of pending operations, each `{ id, client_id, type, payload, created_at, attempts }`. The UI shows a pending count.
 - **Operation types:** `lot.add`, `lot.consume` (delta), `lot.move`, `shopping.add`, `shopping.toggle`, `shopping.delete`.
 
