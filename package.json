@@ -12,7 +12,7 @@
     "build": "vite build",
     "start": "node src/server/index.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node --test src/server/"
+    "test": "node --test \"src/**/*.test.ts\""
   },
   "dependencies": {
     "@hono/node-server": "^2.1.6",
