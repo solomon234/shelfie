@@ -24,7 +24,7 @@ test("rejects a non-numeric PORT with a clear message", () => {
 });
 
 test("fails clearly when the built frontend is missing", () => {
-  const r = run({ PORT: "0", SHELFIE_WEB_DIR: "/nonexistent/web" });
+  const r = run({ PORT: "8799", SHELFIE_WEB_DIR: "/nonexistent/web" });
   assert.equal(r.status, 1);
   assert.match(r.stderr, /built frontend not found/);
 });
