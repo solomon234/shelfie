@@ -1,0 +1,69 @@
+- id: "1"
+  title: Foundation - migrations, schema v1, API 404, startup checks
+  description: >-
+    Add the ordered migration runner on PRAGMA user_version and replace the scaffold schema with
+    data-model.md (composite FKs, CHECKs, scoped client_id); unknown /api/* returns JSON 404 and
+    startup fails clearly on bad PORT, unwritable data dir or missing frontend. Covers CAP-8.
+  spec_checkpoint: true
+  invoke_dev_with: >-
+    Move static serving and SPA fallback into createApp so tests reach them. Tests must cover
+    constraints, FK enforcement, migrations and the API 404.
+- id: "2"
+  title: Auth - gated setup, users, sessions, households
+  description: >-
+    Implement first-run setup gated by SHELFIE_SETUP_TOKEN, login with hashed session tokens,
+    users, households and memberships with household-scoped access, rate-limited login and setup.
+    Covers CAP-1.
+  spec_checkpoint: true
+  invoke_dev_with: >-
+    Remove first_run from the public health response. Every query must be scoped by household.
+    Roles are owner and member per SPEC constraints; keep permission checks in one place.
+- id: "3"
+  title: Inventory API - lots, consume, move, locations
+  description: >-
+    Household-scoped endpoints to add, list, consume, move and adjust lots and list locations,
+    with idempotency on (household_id, client_id) and last-unit removal. Covers CAP-2.
+- id: "4"
+  title: Barcode - normalization, Open Food Facts lookup, scanner UI
+  description: >-
+    Normalize UPC-A and EAN-13, look up products server-side with a descriptive User-Agent and
+    manual fallback, and add the in-browser camera scanner. Covers CAP-3.
+  invoke_dev_with: >-
+    Lookups must degrade to manual entry on failure or timeout and never block the add flow.
+- id: "5"
+  title: Core UI - home, inventory, add lot
+  description: >-
+    Build the Preact screens from ux-flows.md for home, scan-then-add, inventory and use-an-item,
+    with expiry badges and presets. Covers the UI for CAP-2 and CAP-4.
+- id: "6"
+  title: Expiry alerts - dashboard, daily job, ntfy and webhook
+  description: >-
+    Add the expiring and expired dashboard data, the per-household daily check using timezone and
+    warning window, and ntfy or webhook delivery recorded in alert_state. Covers CAP-4.
+  spec_checkpoint: true
+  invoke_dev_with: >-
+    Alerts fire once per transition with no reminders. Record a transition in alert_state only after a successful send.
+- id: "7"
+  title: Shopping list
+  description: >-
+    Shared household shopping list with manual add, add from inventory, tick off and delete,
+    idempotent on client_id. Covers CAP-5.
+- id: "8"
+  title: Offline - service worker, outbox, sync endpoint
+  description: >-
+    Implement the read cache, IndexedDB outbox, replay on online and app open, and POST /api/sync
+    per offline-sync.md, including pending-name scans and the needs-attention list. Covers CAP-6.
+  spec_checkpoint: true
+  invoke_dev_with: >-
+    Test replay with interrupted and repeated
+    requests and with the network toggled in the browser.
+- id: "9"
+  title: PWA install - manifest, icons, install UX
+  description: >-
+    Add 192 and 512 icons, complete the manifest, and add the install control for Android and iOS
+    steps so the app is installable. Covers CAP-7.
+- id: "10"
+  title: Release hardening - image smoke test, CI permissions, SHA pinning
+  description: >-
+    Add an image smoke test to CI, set workflow permissions to read-only, pin actions by SHA, use
+    v*.*.* release tags and a healthcheck, and verify the arm64 image starts. Covers CAP-8.
