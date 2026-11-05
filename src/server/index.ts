@@ -28,7 +28,7 @@ if (!apiOnly && !existsSync(resolve(staticRoot, "index.html"))) {
 }
 
 const db = openDb(dbPath);
-const app = createApp(db, { staticRoot: apiOnly ? undefined : staticRoot });
+const app = createApp(db, { staticRoot: apiOnly ? undefined : staticRoot, setupToken: process.env.SHELFIE_SETUP_TOKEN });
 
 const server = serve({ fetch: app.fetch, port }, () => console.log(`shelfie listening on :${port}`));
 
