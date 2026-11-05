@@ -4,6 +4,7 @@ import type { DatabaseSync } from "node:sqlite";
 import type { Ctx, Env } from "./context.ts";
 import { HttpError } from "./context.ts";
 import { registerAuthRoutes } from "./routes-auth.ts";
+import { registerInventoryRoutes } from "./routes-inventory.ts";
 import { serveSpa } from "./static.ts";
 
 export const VERSION = "0.1.0";
@@ -48,6 +49,7 @@ export function createApp(db: DatabaseSync, options: AppOptions = {}) {
   });
 
   registerAuthRoutes(app, ctx);
+  registerInventoryRoutes(app, ctx);
 
   // Unknown API paths must never fall through to the SPA shell.
   app.all("/api/*", (c) => c.json({ error: "Not found" }, 404));
