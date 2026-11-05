@@ -1,5 +1,6 @@
 import type { Context, Hono } from "hono";
 import { deleteCookie, setCookie } from "hono/cookie";
+import { sendTest } from "./alerts.ts";
 import type { Ctx, Env } from "./context.ts";
 import { HttpError } from "./context.ts";
 import {
@@ -142,6 +143,14 @@ export function registerAuthRoutes(app: Hono<Env>, ctx: Ctx): void {
     if (!sets.length) throw new HttpError(400, "Nothing to update");
     ctx.db.prepare(`UPDATE households SET ${sets.join(", ")} WHERE id = ?`).run(...vals, hid);
     return c.json({ ok: true });
+  });
+
+  app.post("/api/households/:id/alerts/test", auth, async (c) => {
+    const hid = id(c.req.param("id"));
+    requireOwner(ctx, c.get("user").id, hid);
+    const r = await sendTest(ctx, hid);
+    if (!r.targets) throw new HttpError(400, "No alert target is configured");
+    return c.json(r, r.sent ? 200 : 502);
   });
 
   app.get("/api/households/:id/members", auth, (c) => {

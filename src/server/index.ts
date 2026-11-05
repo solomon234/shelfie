@@ -1,6 +1,7 @@
 import { accessSync, constants, existsSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { serve } from "@hono/node-server";
+import { startAlertScheduler } from "./alerts.ts";
 import { createApp } from "./app.ts";
 import { openDb } from "./db.ts";
 
@@ -28,7 +29,12 @@ if (!apiOnly && !existsSync(resolve(staticRoot, "index.html"))) {
 }
 
 const db = openDb(dbPath);
-const app = createApp(db, { staticRoot: apiOnly ? undefined : staticRoot, setupToken: process.env.SHELFIE_SETUP_TOKEN });
+const app = createApp(db, {
+  staticRoot: apiOnly ? undefined : staticRoot,
+  setupToken: process.env.SHELFIE_SETUP_TOKEN,
+  defaultTargets: { ntfy: process.env.SHELFIE_NTFY_URL, webhook: process.env.SHELFIE_WEBHOOK_URL },
+});
+startAlertScheduler(app.ctx);
 
 const server = serve({ fetch: app.fetch, port }, () => console.log(`shelfie listening on :${port}`));
 

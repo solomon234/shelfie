@@ -15,6 +15,7 @@ export interface AppOptions {
   setupToken?: string;
   now?: () => Date;
   fetch?: typeof fetch;
+  defaultTargets?: { ntfy?: string; webhook?: string };
 }
 
 export function createApp(db: DatabaseSync, options: AppOptions = {}) {
@@ -23,6 +24,7 @@ export function createApp(db: DatabaseSync, options: AppOptions = {}) {
     setupToken: options.setupToken,
     now: options.now ?? (() => new Date()),
     fetch: options.fetch ?? fetch,
+    defaultTargets: options.defaultTargets ?? {},
     userAgent: process.env.OFF_USER_AGENT ?? `Shelfie/${VERSION} (self-hosted pantry tracker)`,
   };
   const app = new Hono<Env>();
@@ -62,5 +64,5 @@ export function createApp(db: DatabaseSync, options: AppOptions = {}) {
     return c.json({ error: "Internal error" }, 500);
   });
 
-  return app;
+  return Object.assign(app, { ctx });
 }

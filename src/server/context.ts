@@ -6,6 +6,7 @@ export interface Ctx {
   now: () => Date;
   fetch: typeof fetch;
   userAgent: string;
+  defaultTargets: { ntfy?: string; webhook?: string };
 }
 
 export interface User {
