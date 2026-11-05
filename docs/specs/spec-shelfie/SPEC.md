@@ -30,7 +30,7 @@ A vision to realize, driven by a pain: the owner's household throws away food be
   - **success:** Scanning a UPC-A and the same product's EAN-13 resolves to one product; an unknown barcode falls back to manual entry without blocking.
 - **CAP-4**
   - **intent:** A household sees what is expired or about to expire and is told before food goes off.
-  - **success:** The dashboard lists expired lots and lots inside the household's warning window; a household can set its own timezone and the time of day it receives alerts; a lot entering the window produces exactly one ntfy or webhook message at the next alert time in that household's timezone.
+  - **success:** The dashboard lists expired lots and lots inside the household's warning window; a household can set its own timezone and the time of day it receives alerts; a lot entering the window produces exactly one notification at the next alert time in that household's timezone, delivered as Web Push to every subscribed device of the household's members, and to ntfy or a webhook when configured.
 - **CAP-5**
   - **intent:** A household shares one shopping list, can add items manually or from inventory, and tick them off.
   - **success:** An item added on one device appears on another household member's device; ticking persists.
@@ -62,7 +62,7 @@ A vision to realize, driven by a pain: the owner's household throws away food be
 
 ## Non-goals
 
-- Native push notifications (v1 alerts go through ntfy or a generic webhook).
+- Native mobile apps and platform-specific push SDKs (alerts use Web Push from the installed PWA, ntfy, or a generic webhook).
 - Receipt import.
 - Home Assistant integration (a generic webhook can serve it later).
 - Native mobile apps.

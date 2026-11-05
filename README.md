@@ -7,8 +7,9 @@ food goes off, and keep working at the store with no signal.
 
 - **Per-lot expiry.** Two packs of the same product keep separate dates. The home screen lists what is expired or
   about to expire.
-- **Expiry alerts.** A daily check, at a time and timezone you choose per household, posts to
-  [ntfy](https://ntfy.sh) and/or a generic webhook. Each item alerts once when it enters the warning window and once
+- **Expiry alerts.** A daily check, at a time and timezone you choose per household, sends a push notification to
+  every device that turned on notifications in Settings (Web Push from the installed app, no extra app needed), and
+  optionally to [ntfy](https://ntfy.sh) or a generic webhook. Each item alerts once when it enters the warning window and once
   when it expires.
 - **Offline capture.** The app opens with no connection, shows your last-known stock, and lets you scan, add, use up
   and move items. Changes queue on the device and sync, exactly once each, when you are back online.

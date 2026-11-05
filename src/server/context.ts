@@ -1,5 +1,14 @@
 import type { DatabaseSync } from "node:sqlite";
 
+export interface PushTarget {
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+}
+
+// 'gone' means the push service says the subscription no longer exists and it should be deleted.
+export type PushSender = (target: PushTarget, payload: string) => Promise<"ok" | "gone" | "error">;
+
 export interface Ctx {
   db: DatabaseSync;
   setupToken?: string;
@@ -7,6 +16,7 @@ export interface Ctx {
   fetch: typeof fetch;
   userAgent: string;
   defaultTargets: { ntfy?: string; webhook?: string };
+  sendPush: PushSender;
 }
 
 export interface User {

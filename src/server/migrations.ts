@@ -90,4 +90,22 @@ CREATE TABLE applied_ops (
 );
 `;
 
-export const MIGRATIONS: readonly string[] = [V1];
+// Web Push: one row per subscribed device (browser), owned by a user; VAPID keys live in `settings`.
+const V2 = `
+CREATE TABLE settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+CREATE TABLE push_subscriptions (
+  id INTEGER PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  endpoint TEXT NOT NULL UNIQUE,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  user_agent TEXT,
+  created_at TEXT NOT NULL DEFAULT (${NOW})
+);
+CREATE INDEX idx_push_user ON push_subscriptions(user_id);
+`;
+
+export const MIGRATIONS: readonly string[] = [V1, V2];

@@ -6,6 +6,7 @@ import { test } from "node:test";
 import { DatabaseSync } from "node:sqlite";
 import { backupDatabase } from "./backup.ts";
 import { openDb } from "./db.ts";
+import { MIGRATIONS } from "./migrations.ts";
 
 const tmp = () => mkdtempSync(join(tmpdir(), "shelfie-bk-"));
 
@@ -19,7 +20,7 @@ test("a backup taken while the database is open and busy restores cleanly", asyn
   const copy = new DatabaseSync(file, { readOnly: true });
   assert.equal((copy.prepare("PRAGMA integrity_check").get() as { integrity_check: string }).integrity_check, "ok");
   assert.equal((copy.prepare("SELECT COUNT(*) n FROM households").get() as { n: number }).n, 200);
-  assert.equal((copy.prepare("PRAGMA user_version").get() as { user_version: number }).user_version, 1);
+  assert.equal((copy.prepare("PRAGMA user_version").get() as { user_version: number }).user_version, MIGRATIONS.length);
   copy.close();
   live.close();
 });

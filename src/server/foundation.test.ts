@@ -34,7 +34,7 @@ test("migrating an existing file keeps its data", () => {
   a.close();
   const b = openDb(path, [...MIGRATIONS, "ALTER TABLE households ADD COLUMN note TEXT;"]);
   assert.equal((b.prepare("SELECT name FROM households").get() as { name: string }).name, "Keep");
-  assert.equal((b.prepare("PRAGMA user_version").get() as { user_version: number }).user_version, 2);
+  assert.equal((b.prepare("PRAGMA user_version").get() as { user_version: number }).user_version, MIGRATIONS.length + 1);
 });
 
 test("a failed migration rolls back and leaves the version unchanged", () => {

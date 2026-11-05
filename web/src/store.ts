@@ -38,19 +38,22 @@ export interface Store {
   clearAll(): Promise<void>;
 }
 
-export function createStore(factory: IDBFactory = indexedDB, name = "shelfie"): Store {
-  const opened = new Promise<IDBDatabase>((resolve, reject) => {
-    const r = factory.open(name, 1);
-    r.onupgradeneeded = () => {
-      const db = r.result;
-      db.createObjectStore("outbox", { keyPath: "seq", autoIncrement: true });
-      db.createObjectStore("cache", { keyPath: "key" });
-      db.createObjectStore("kv", { keyPath: "key" });
-    };
-    r.onsuccess = () => resolve(r.result);
-    r.onerror = () => reject(r.error);
-  });
-  const store = async (s: string, mode: IDBTransactionMode) => (await opened).transaction(s, mode).objectStore(s);
+export function createStore(factory?: IDBFactory, name = "shelfie"): Store {
+  // Opened on first use, so importing this module never touches IndexedDB (it does not exist in Node).
+  let opened: Promise<IDBDatabase> | undefined;
+  const open = () =>
+    (opened ??= new Promise<IDBDatabase>((resolve, reject) => {
+      const r = (factory ?? indexedDB).open(name, 1);
+      r.onupgradeneeded = () => {
+        const db = r.result;
+        db.createObjectStore("outbox", { keyPath: "seq", autoIncrement: true });
+        db.createObjectStore("cache", { keyPath: "key" });
+        db.createObjectStore("kv", { keyPath: "key" });
+      };
+      r.onsuccess = () => resolve(r.result);
+      r.onerror = () => reject(r.error);
+    }));
+  const store = async (s: string, mode: IDBTransactionMode) => (await open()).transaction(s, mode).objectStore(s);
 
   return {
     async enqueue(op) {

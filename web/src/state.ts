@@ -3,6 +3,7 @@ import { localParts, daysBetween } from "../../src/shared/dates.ts";
 import { ApiError, NetworkError, api, cachedGet, store } from "./api.ts";
 import { overlayLots, overlayShopping, type Lot, type LocationRef, type ShoppingItem } from "./overlay.ts";
 import type { Notice, OpType, QueuedOp } from "./store.ts";
+import { resyncPush } from "./push.ts";
 import { replay } from "./sync.ts";
 
 export interface Household {
@@ -141,6 +142,7 @@ async function enter(me: Me): Promise<void> {
   set({ me, householdId: hid, phase: "ready", names: (await store.kvGet<Record<string, string>>("names")) ?? {} });
   await refresh();
   void import("./scanner.tsx"); // warm the scanner chunk so scanning works offline later
+  void resyncPush();
 }
 
 export async function boot(): Promise<void> {

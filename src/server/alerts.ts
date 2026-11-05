@@ -1,5 +1,6 @@
 import { resolvePendingProducts } from "./barcode.ts";
 import type { Ctx } from "./context.ts";
+import { householdDevices, pushToHousehold } from "./push.ts";
 import { daysBetween, localParts } from "../shared/dates.ts";
 
 interface HouseholdRow {
@@ -54,7 +55,7 @@ async function post(ctx: Ctx, url: string, init: RequestInit): Promise<boolean> 
 }
 
 // Sends to every configured target; true when at least one accepted it.
-export async function deliver(ctx: Ctx, h: { name: string }, targets: Targets, expired: AlertItem[], warning: AlertItem[], date: string): Promise<boolean> {
+export async function deliver(ctx: Ctx, h: { id: number; name: string }, targets: Targets, expired: AlertItem[], warning: AlertItem[], date: string): Promise<boolean> {
   const m = message(h, expired, warning);
   const results: boolean[] = [];
   if (targets.ntfy) {
@@ -63,6 +64,9 @@ export async function deliver(ctx: Ctx, h: { name: string }, targets: Targets, e
   if (targets.webhook) {
     results.push(await post(ctx, targets.webhook, { headers: { "Content-Type": "application/json", "User-Agent": ctx.userAgent }, body: JSON.stringify({ household: h.name, date, title: m.title, expired, warning }) }));
   }
+  // Web Push to every subscribed device of the household's members.
+  const push = await pushToHousehold(ctx, h.id, { title: m.title, body: m.body, tag: `shelfie-${h.id}-${date}`, url: "/" });
+  if (push.attempted) results.push(push.sent > 0);
   return results.some(Boolean);
 }
 
@@ -70,8 +74,9 @@ export async function sendTest(ctx: Ctx, householdId: number): Promise<{ sent: b
   const h = ctx.db.prepare("SELECT * FROM households WHERE id = ?").get(householdId) as unknown as HouseholdRow;
   const t = targetsFor(ctx, h);
   const sample: AlertItem = { lot_id: 0, name: "Test item", quantity: 1, unit: "item", expires_on: localParts(ctx.now(), h.timezone).date, days: 0, location: "Pantry" };
+  const devices = householdDevices(ctx, householdId).length;
   const sent = await deliver(ctx, h, t, [], [sample], sample.expires_on);
-  return { sent, targets: Number(Boolean(t.ntfy)) + Number(Boolean(t.webhook)) };
+  return { sent, targets: Number(Boolean(t.ntfy)) + Number(Boolean(t.webhook)) + devices };
 }
 
 // Each lot is alerted once per transition: entering the warning window, then becoming expired.
@@ -82,7 +87,7 @@ export async function runAlertCheck(ctx: Ctx): Promise<{ households: number; ale
     const local = localParts(ctx.now(), h.timezone);
     if (local.hour < h.alert_hour || h.last_alert_on === local.date) continue;
     const targets = targetsFor(ctx, h);
-    if (!targets.ntfy && !targets.webhook) continue;
+    if (!targets.ntfy && !targets.webhook && !householdDevices(ctx, h.id).length) continue;
 
     const cutoff = new Date(Date.parse(local.date + "T00:00:00Z") + h.expiry_warning_days * 86400_000).toISOString().slice(0, 10);
     const rows = ctx.db

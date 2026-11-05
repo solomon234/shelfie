@@ -3,6 +3,7 @@ import { lazy, Suspense } from "preact/compat";
 import { localParts } from "../../src/shared/dates.ts";
 import { ApiError, api } from "./api.ts";
 import type { Lot } from "./overlay.ts";
+import { disablePush, enablePush, pushState, sendTestPush, type PushState } from "./push.ts";
 import {
   daysLeft, discardOp, dismissNotice, enqueue, errMsg, household, invalidOps, lots, pendingCount, reloadMe,
   refresh, selectHousehold, shopping, signIn, signOut, summary, syncNow, toast, useApp, type Household,
@@ -404,6 +405,7 @@ function Settings() {
   };
   return (
     <>
+      <Notifications />
       {h?.role === "owner" && <HouseholdSettings h={h} />}
       <section class="card">
         <h2>This device</h2>
@@ -419,6 +421,48 @@ function Settings() {
       </section>
       <TzList />
     </>
+  );
+}
+
+function Notifications() {
+  const [state, setState] = useState<PushState | "checking">("checking");
+  const [busy, setBusy] = useState(false);
+  const refreshState = () => pushState().then(setState).catch(() => setState("unsupported"));
+  useEffect(() => { void refreshState(); }, []);
+  const run = (fn: () => Promise<unknown>, ok?: string) => async () => {
+    setBusy(true);
+    try {
+      await fn();
+      if (ok) toast(ok);
+    } catch (e) {
+      toast(errMsg(e));
+    } finally {
+      setBusy(false);
+      await refreshState();
+    }
+  };
+  return (
+    <section class="card">
+      <h2>Notifications on this device</h2>
+      {state === "checking" && <p class="muted">Checking…</p>}
+      {state === "unsupported" && <p class="muted">Not available here. Open the installed app over HTTPS to get expiry alerts as notifications.</p>}
+      {state === "denied" && <p class="hint">Notifications are blocked for this site. Allow them in your browser's site settings, then come back.</p>}
+      {state === "off" && (
+        <>
+          <p class="muted">Get an alert when food is about to expire, even when the app is closed.</p>
+          <div class="buttons"><button class="primary" disabled={busy} onClick={run(enablePush, "Notifications on")}>Turn on notifications</button></div>
+        </>
+      )}
+      {state === "on" && (
+        <>
+          <p class="muted">On for this device. Alerts follow your household's alert time.</p>
+          <div class="buttons">
+            <button disabled={busy} onClick={run(async () => { await sendTestPush(); }, "Test notification sent")}>Send test</button>
+            <button disabled={busy} onClick={run(disablePush, "Notifications off")}>Turn off</button>
+          </div>
+        </>
+      )}
+    </section>
   );
 }
 

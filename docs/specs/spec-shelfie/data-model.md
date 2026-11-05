@@ -12,6 +12,8 @@ Target schema after migration 1. All ids are integer primary keys unless noted. 
 | `products` | `id`, `barcode`, `name`, `name_key`, `brand`, `image_url`, `resolved` | `barcode` unique when not null, stored as EAN-13; `name_key` is the lower-cased trimmed name, unique where `barcode IS NULL`, so a lot with no barcode matches or creates a product by name; `resolved` 0 until the server names an offline scan. |
 | `lots` | `id`, `client_id`, `household_id`, `location_id`, `product_id`, `quantity`, `unit`, `expires_on`, `purchased_on`, `notes`, `created_by`, `created_at` | `UNIQUE(household_id, client_id)`; `FOREIGN KEY(location_id, household_id)` references `locations(id, household_id)`; `quantity > 0`; `expires_on` and `purchased_on` `CHECK(x IS NULL OR date(x) = x)`; index on `(household_id, expires_on)`. |
 | `shopping_items` | `id`, `client_id`, `household_id`, `name`, `quantity`, `unit`, `checked` | `UNIQUE(household_id, client_id)`. |
+| `settings` | `key`, `value` | Key/value store; holds the VAPID key pair (`vapid_public`, `vapid_private`), generated once so devices stay subscribed across restarts. |
+| `push_subscriptions` | `id`, `user_id`, `endpoint`, `p256dh`, `auth`, `user_agent`, `created_at` | `endpoint` unique; cascade on user delete; `endpoint` must be https on a known push service host (FCM, Mozilla, Apple, Windows) so the server cannot be pointed at internal addresses; rows are deleted when the push service reports them gone (404/410). |
 | `alert_state` | `lot_id`, `state`, `notified_at` | PK `(lot_id, state)`, `state IN ('warning','expired')`; written after a successful send so each transition notifies once. |
 
 ## Rules

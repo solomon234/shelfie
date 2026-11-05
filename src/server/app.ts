@@ -4,11 +4,13 @@ import type { DatabaseSync } from "node:sqlite";
 import type { Ctx, Env } from "./context.ts";
 import { HttpError } from "./context.ts";
 import { registerAuthRoutes } from "./routes-auth.ts";
+import { makeWebPushSender } from "./push.ts";
 import { registerInventoryRoutes } from "./routes-inventory.ts";
+import { registerPushRoutes } from "./routes-push.ts";
 import { registerSyncRoutes } from "./routes-sync.ts";
 import { serveSpa } from "./static.ts";
 
-export const VERSION = "0.1.0";
+export const VERSION = "0.2.0";
 
 export interface AppOptions {
   // Directory of the built frontend. When omitted the app is API-only.
@@ -17,6 +19,7 @@ export interface AppOptions {
   now?: () => Date;
   fetch?: typeof fetch;
   defaultTargets?: { ntfy?: string; webhook?: string };
+  sendPush?: Ctx["sendPush"];
 }
 
 export function createApp(db: DatabaseSync, options: AppOptions = {}) {
@@ -26,6 +29,7 @@ export function createApp(db: DatabaseSync, options: AppOptions = {}) {
     now: options.now ?? (() => new Date()),
     fetch: options.fetch ?? fetch,
     defaultTargets: options.defaultTargets ?? {},
+    sendPush: options.sendPush ?? makeWebPushSender(db, process.env.SHELFIE_VAPID_SUBJECT ?? "mailto:admin@shelfie.local"),
     userAgent: process.env.OFF_USER_AGENT ?? `Shelfie/${VERSION} (self-hosted pantry tracker)`,
   };
   const app = new Hono<Env>();
@@ -54,6 +58,7 @@ export function createApp(db: DatabaseSync, options: AppOptions = {}) {
   registerAuthRoutes(app, ctx);
   registerInventoryRoutes(app, ctx);
   registerSyncRoutes(app, ctx);
+  registerPushRoutes(app, ctx);
 
   // Unknown API paths must never fall through to the SPA shell.
   app.all("/api/*", (c) => c.json({ error: "Not found" }, 404));

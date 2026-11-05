@@ -19,6 +19,7 @@
 | `SHELFIE_SETUP_TOKEN` | Required to complete first-run setup. |
 | `SHELFIE_NTFY_URL` | Optional ntfy topic URL for alerts. |
 | `SHELFIE_WEBHOOK_URL` | Optional generic webhook for alerts. |
+| `SHELFIE_VAPID_SUBJECT` | `mailto:` or `https:` contact sent to push services in the VAPID claim (default `mailto:admin@shelfie.local`). |
 | `OFF_USER_AGENT` | Descriptive User-Agent for Open Food Facts requests. |
 | `TZ` | Process timezone; per-household timezone overrides for alerts. |
 
