@@ -1,0 +1,28 @@
+{
+  "name": "shelfie",
+  "version": "0.0.1",
+  "description": "Self-hosted pantry tracker with expiry alerts and offline capture.",
+  "license": "MIT",
+  "type": "module",
+  "private": true,
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "dev:server": "node --watch src/server/index.ts",
+    "dev:web": "vite",
+    "build": "vite build",
+    "start": "node src/server/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test src/server/"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.6",
+    "hono": "^4.13.16",
+    "preact": "^11.1.1"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2.10.6",
+    "@types/node": "^24.0.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.6"
+  }
+}

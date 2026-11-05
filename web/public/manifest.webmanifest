@@ -1,0 +1,10 @@
+{
+  "name": "Shelfie",
+  "short_name": "Shelfie",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#111827",
+  "theme_color": "#111827",
+  "icons": []
+}
