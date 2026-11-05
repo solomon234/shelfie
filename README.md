@@ -3,6 +3,8 @@
 A self-hosted pantry tracker built as a PWA. Scan items in, track expiry per package, get alerted before
 food goes off, and keep working at the store with no signal.
 
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-support-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/solomonmurf)
+
 ## Features
 
 - **Per-lot expiry.** Two packs of the same product keep separate dates. The home screen lists what is expired or
