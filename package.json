@@ -1,6 +1,6 @@
 {
   "name": "shelfie",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Self-hosted pantry tracker with expiry alerts and offline capture.",
   "license": "MIT",
   "type": "module",
