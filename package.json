@@ -7,7 +7,7 @@
   "private": true,
   "engines": { "node": ">=24" },
   "scripts": {
-    "dev:server": "node --watch src/server/index.ts",
+    "dev:server": "SHELFIE_API_ONLY=1 node --watch src/server/index.ts",
     "dev:web": "vite",
     "build": "vite build",
     "start": "node src/server/index.ts",
