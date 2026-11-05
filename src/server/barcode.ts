@@ -86,3 +86,18 @@ export async function resolveProduct(ctx: Ctx, input: ProductInput): Promise<num
   db.prepare("INSERT OR IGNORE INTO products(name,name_key,brand,image_url) VALUES (?,?,?,?)").run(name, nameKey(name), input.brand ?? null, input.image_url ?? null);
   return (db.prepare("SELECT id FROM products WHERE name_key = ? AND barcode IS NULL").get(nameKey(name)) as { id: number }).id;
 }
+
+// Offline scans can be saved before the name is known. Retries the lookup for those products.
+export async function resolvePendingProducts(ctx: Ctx, limit = 20): Promise<number> {
+  const rows = ctx.db.prepare("SELECT id, barcode FROM products WHERE resolved = 0 AND barcode IS NOT NULL LIMIT ?").all(limit) as { id: number; barcode: string }[];
+  let n = 0;
+  for (const r of rows) {
+    const found = await lookupProduct(ctx, r.barcode);
+    if (!found.found) continue;
+    ctx.db.prepare("UPDATE products SET name = ?, name_key = ?, brand = ?, image_url = ?, resolved = 1 WHERE id = ?").run(
+      found.name!, nameKey(found.name!), found.brand ?? null, found.image_url ?? null, r.id,
+    );
+    n++;
+  }
+  return n;
+}

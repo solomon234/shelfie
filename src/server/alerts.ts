@@ -1,3 +1,4 @@
+import { resolvePendingProducts } from "./barcode.ts";
 import type { Ctx } from "./context.ts";
 import { daysBetween, localParts } from "./dates.ts";
 
@@ -114,7 +115,8 @@ export async function runAlertCheck(ctx: Ctx): Promise<{ households: number; ale
 }
 
 export function startAlertScheduler(ctx: Ctx, everyMs = 5 * 60_000): NodeJS.Timeout {
-  const tick = () => runAlertCheck(ctx).catch((e) => console.error("shelfie: alert check failed", e));
+  const tick = () =>
+    Promise.all([runAlertCheck(ctx), resolvePendingProducts(ctx)]).catch((e) => console.error("shelfie: background check failed", e));
   setTimeout(tick, 15_000).unref();
   const timer = setInterval(tick, everyMs);
   timer.unref();
