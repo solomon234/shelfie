@@ -433,6 +433,7 @@ function Settings() {
     <>
       <Notifications />
       {h?.role === "owner" && <HouseholdSettings h={h} />}
+      {s.me!.is_admin && <AdminAccounts />}
       <ChangePassword />
       <section class="card">
         <h2>This device</h2>
@@ -448,6 +449,89 @@ function Settings() {
       </section>
       <TzList />
     </>
+  );
+}
+
+interface AdminUser { id: number; username: string; is_admin: boolean; households: { name: string; role: string }[] }
+
+// Instance admins only: make accounts for other people (each with a household of their own) and extra households for yourself.
+function AdminAccounts() {
+  const s = useApp();
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const [reset, setReset] = useState<{ id: number; username: string; password: string } | null>(null);
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [f, setF] = useState({ username: "", password: "", household_name: "" });
+  const [mine, setMine] = useState("");
+  const load = () => api<AdminUser[]>("/api/admin/users").then(setUsers).catch(() => {});
+  useEffect(() => { void load(); }, []);
+  async function createAccount(e: Event) {
+    e.preventDefault();
+    try {
+      await api("/api/admin/users", {
+        method: "POST",
+        body: { username: f.username, password: await protectPassword(f.username, f.password), household_name: f.household_name || undefined, timezone: tz },
+      });
+      setF({ username: "", password: "", household_name: "" });
+      await load();
+      toast("Account created");
+    } catch (err) {
+      toast(errMsg(err));
+    }
+  }
+  async function resetPassword(e: Event) {
+    e.preventDefault();
+    if (!reset) return;
+    try {
+      await api(`/api/admin/users/${reset.id}/password`, { method: "POST", body: { password: await protectPassword(reset.username, reset.password) } });
+      toast(`Password reset for ${reset.username}. They are signed out everywhere.`);
+      setReset(null);
+    } catch (err) {
+      toast(errMsg(err));
+    }
+  }
+  async function createMine(e: Event) {
+    e.preventDefault();
+    try {
+      await api("/api/households", { method: "POST", body: { name: mine, timezone: tz } });
+      setMine("");
+      await Promise.all([reloadMe(), load()]);
+      toast("Household created");
+    } catch (err) {
+      toast(errMsg(err));
+    }
+  }
+  return (
+    <section class="card">
+      <h2>Accounts</h2>
+      {users.map((u) => (
+        <>
+          <div class="row">
+            <strong>{u.username}{u.is_admin ? " (admin)" : ""}</strong>
+            <small>{u.households.map((h) => `${h.name} (${h.role})`).join(", ") || "no household"}</small>
+            {u.id !== s.me!.id && <button type="button" onClick={() => setReset({ id: u.id, username: u.username, password: "" })}>Reset password</button>}
+          </div>
+          {reset?.id === u.id && (
+            <form class="stack" onSubmit={resetPassword}>
+              <label>New password for {u.username}<input type="password" value={reset.password} onInput={(e) => setReset({ ...reset, password: val(e) })} required minLength={8} autocomplete="new-password" /></label>
+              <div class="buttons"><button>Save</button><button type="button" onClick={() => setReset(null)}>Cancel</button></div>
+            </form>
+          )}
+        </>
+      ))}
+      <h3>New account</h3>
+      <p class="muted">The person gets a household of their own that only they can see. Give them the password; they can change it in Settings.</p>
+      <form class="stack" onSubmit={createAccount}>
+        <label>Username<input value={f.username} onInput={(e) => setF({ ...f, username: val(e) })} required minLength={2} autocapitalize="none" /></label>
+        <label>Password<input type="password" value={f.password} onInput={(e) => setF({ ...f, password: val(e) })} required minLength={8} autocomplete="new-password" /></label>
+        <label>Household name (optional)<input value={f.household_name} onInput={(e) => setF({ ...f, household_name: val(e) })} placeholder="Their pantry" /></label>
+        <button>Create account</button>
+      </form>
+      <h3>New household for you</h3>
+      <form class="stack" onSubmit={createMine}>
+        <label>Name<input value={mine} onInput={(e) => setMine(val(e))} required /></label>
+        <button>Create household</button>
+      </form>
+    </section>
   );
 }
 

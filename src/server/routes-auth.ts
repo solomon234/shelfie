@@ -121,6 +121,63 @@ export function registerAuthRoutes(app: Hono<Env>, ctx: Ctx): void {
     return c.json({ ok: true });
   });
 
+  // Instance admins create accounts for other people. Each account gets a household of its own, so pantries
+  // stay separate; the admin is not added to it.
+  app.get("/api/admin/users", auth, (c) => {
+    if (!c.get("user").is_admin) throw new HttpError(403, "Only instance admins can do this");
+    const users = ctx.db.prepare("SELECT id, username, is_admin, created_at FROM users ORDER BY username").all() as {
+      id: number;
+      username: string;
+      is_admin: number;
+      created_at: string;
+    }[];
+    const memberships = ctx.db
+      .prepare("SELECT m.user_id, h.name, m.role FROM memberships m JOIN households h ON h.id = m.household_id ORDER BY h.name")
+      .all() as { user_id: number; name: string; role: string }[];
+    return c.json(
+      users.map((u) => ({
+        id: u.id,
+        username: u.username,
+        is_admin: u.is_admin === 1,
+        created_at: u.created_at,
+        households: memberships.filter((m) => m.user_id === u.id).map((m) => ({ name: m.name, role: m.role })),
+      })),
+    );
+  });
+
+  app.post("/api/admin/users", auth, async (c) => {
+    if (!c.get("user").is_admin) throw new HttpError(403, "Only instance admins can do this");
+    const body = await readBody(c);
+    const username = str(body, "username", 2, 40);
+    const password = str(body, "password", 8, 200);
+    const householdName = optStr(body, "household_name", 80) ?? `${username}'s pantry`;
+    const tz = timezone(optStr(body, "timezone", 64) ?? "UTC");
+    const created = ctx.db.transaction(() => {
+      if (ctx.db.prepare("SELECT 1 FROM users WHERE username = ?").get(username)) throw new HttpError(409, "That username is taken");
+      const userId = Number(
+        ctx.db.prepare("INSERT INTO users(username,password_hash) VALUES (?,?)").run(username, hashPassword(password, ctx.passwordMode)).lastInsertRowid,
+      );
+      return { id: userId, household_id: createHousehold(ctx, userId, householdName, tz) };
+    });
+    return c.json({ ...created, username, household_name: householdName }, 201);
+  });
+
+  // For someone who forgot their password. Signs them out everywhere. Admins change their own with /api/me/password.
+  app.post("/api/admin/users/:userId/password", auth, async (c) => {
+    const admin = c.get("user");
+    if (!admin.is_admin) throw new HttpError(403, "Only instance admins can do this");
+    const uid = id(c.req.param("userId"), "user");
+    if (uid === admin.id) throw new HttpError(400, "Use Change password for your own account");
+    const body = await readBody(c);
+    const password = str(body, "password", 8, 200);
+    if (!ctx.db.prepare("SELECT 1 FROM users WHERE id = ?").get(uid)) throw new HttpError(404, "User not found");
+    ctx.db.transaction(() => {
+      ctx.db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(hashPassword(password, ctx.passwordMode), uid);
+      ctx.db.prepare("DELETE FROM sessions WHERE user_id = ?").run(uid);
+    });
+    return c.json({ ok: true });
+  });
+
   app.post("/api/households", auth, async (c) => {
     const user = c.get("user");
     if (!user.is_admin) throw new HttpError(403, "Only instance admins can create households");

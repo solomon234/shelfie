@@ -227,3 +227,55 @@ for (const mode of ["server", "client"] as const) {
     assert.equal((await t.client().json("POST", "/api/login", { username: "admin", password: secret("new-password") })).status, 200);
   });
 }
+
+test("admins create accounts that each get a separate household; others cannot", async () => {
+  const t = testApp();
+  const admin = t.client();
+  await setupInstance(admin);
+
+  const made = await admin.json("POST", "/api/admin/users", { username: "friend", password: "friend-pass-1", household_name: "Friend's shelf", timezone: "America/Chicago" });
+  assert.equal(made.status, 201);
+  assert.equal((await admin.json("POST", "/api/admin/users", { username: "FRIEND", password: "friend-pass-2" })).status, 409); // names compare without case
+  assert.equal((await admin.json("POST", "/api/admin/users", { username: "short", password: "x" })).status, 400);
+
+  const friend = await loginAs(t, "friend", "friend-pass-1");
+  const me = await friend.json("GET", "/api/me");
+  assert.equal(me.body.households.length, 1);
+  assert.equal(me.body.households[0].name, "Friend's shelf");
+  assert.equal(me.body.households[0].role, "owner");
+  assert.equal(me.body.is_admin, false);
+  assert.equal((await friend.json("GET", `/api/households/${made.body.household_id}/locations`)).body.length, 3);
+
+  // The admin is not a member of the new household, and the friend cannot see the admin's.
+  const adminHousehold = (await admin.json("GET", "/api/me")).body.households[0].id;
+  assert.equal((await admin.json("GET", `/api/households/${made.body.household_id}/locations`)).status, 404);
+  assert.equal((await friend.json("GET", `/api/households/${adminHousehold}/locations`)).status, 404);
+
+  assert.equal((await friend.json("GET", "/api/admin/users")).status, 403);
+  assert.equal((await friend.json("POST", "/api/admin/users", { username: "third", password: "third-pass-1" })).status, 403);
+  assert.equal((await t.client().json("GET", "/api/admin/users")).status, 401);
+
+  const list = (await admin.json("GET", "/api/admin/users")).body;
+  assert.deepEqual(list.map((u: { username: string }) => u.username), ["admin", "friend"]);
+  assert.deepEqual(list[1].households, [{ name: "Friend's shelf", role: "owner" }]);
+});
+
+test("admins can reset another account's password, which signs that account out", async () => {
+  const t = testApp();
+  const admin = t.client();
+  await setupInstance(admin);
+  const made = await admin.json("POST", "/api/admin/users", { username: "friend", password: "friend-pass-1" });
+  const friend = await loginAs(t, "friend", "friend-pass-1");
+  const adminId = (await admin.json("GET", "/api/me")).body.id;
+
+  assert.equal((await friend.json("POST", `/api/admin/users/${made.body.id}/password`, { password: "hacked-pass-1" })).status, 403);
+  assert.equal((await admin.json("POST", `/api/admin/users/${adminId}/password`, { password: "another-pass-1" })).status, 400); // own account
+  assert.equal((await admin.json("POST", "/api/admin/users/9999/password", { password: "another-pass-1" })).status, 404);
+  assert.equal((await admin.json("POST", `/api/admin/users/${made.body.id}/password`, { password: "short" })).status, 400);
+
+  assert.equal((await admin.json("POST", `/api/admin/users/${made.body.id}/password`, { password: "fresh-pass-99" })).status, 200);
+  assert.equal((await friend.json("GET", "/api/me")).status, 401);
+  assert.equal((await t.client().json("POST", "/api/login", { username: "friend", password: "friend-pass-1" })).status, 401);
+  assert.equal((await t.client().json("POST", "/api/login", { username: "friend", password: "fresh-pass-99" })).status, 200);
+  assert.equal((await admin.json("GET", "/api/me")).status, 200); // the admin stays signed in
+});
