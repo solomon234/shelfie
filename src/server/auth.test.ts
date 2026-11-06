@@ -206,3 +206,24 @@ test("an existing scrypt hash still verifies when the server runs in client mode
   assert.ok(verifyPassword("hunter2hunter2", stored));
   assert.ok(!verifyPassword("wrong", stored));
 });
+
+for (const mode of ["server", "client"] as const) {
+  test(`changing the password (${mode} mode) needs the current one and signs out other devices`, async () => {
+    const t = testApp({ passwordMode: mode });
+    const secret = (p: string) => (mode === "client" ? p.padEnd(43, "x") : p);
+    const c = t.client();
+    await setupInstance(c, { password: secret("old-password") });
+    const other = await loginAs(t, "admin", secret("old-password"));
+
+    assert.equal((await t.client().json("POST", "/api/me/password", { current_password: secret("old-password"), new_password: secret("new-password") })).status, 401);
+    const wrong = await c.json("POST", "/api/me/password", { current_password: secret("not-it-at-all"), new_password: secret("new-password") });
+    assert.equal(wrong.status, 403);
+    assert.equal((await c.json("POST", "/api/me/password", { current_password: secret("old-password"), new_password: "short" })).status, 400);
+
+    assert.equal((await c.json("POST", "/api/me/password", { current_password: secret("old-password"), new_password: secret("new-password") })).status, 200);
+    assert.equal((await c.json("GET", "/api/me")).status, 200); // this device stays signed in
+    assert.equal((await other.json("GET", "/api/me")).status, 401); // the other one does not
+    assert.equal((await t.client().json("POST", "/api/login", { username: "admin", password: secret("old-password") })).status, 401);
+    assert.equal((await t.client().json("POST", "/api/login", { username: "admin", password: secret("new-password") })).status, 200);
+  });
+}

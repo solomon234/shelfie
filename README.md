@@ -20,7 +20,7 @@ food goes off, and keep working at the store with no signal.
   and move items. Changes queue on the device and sync, exactly once each, when you are back online.
 - **Barcode scanning** in the browser (UPC-A, EAN-13, EAN-8) with product lookup through
   [Open Food Facts](https://world.openfoodfacts.org). Offline scans are named by the server after syncing.
-- **Shopping list**, **households** with owners and members, and an installable PWA for Android and iOS.
+- **Shopping list**, **households** with owners and members (members can change their own password), and an installable PWA for Android and iOS.
 
 ## Run it
 
@@ -56,6 +56,28 @@ docker exec shelfie node src/server/backup.ts /data/backups
 Uses SQLite's online backup, so it is safe while the app is running. Each backup is verified and the newest 14 are
 kept (`SHELFIE_BACKUP_KEEP` to change). Restore by stopping the container and copying a backup over
 `shelfie.db`.
+
+### On Cloudflare Workers
+
+Shelfie also runs on Cloudflare's free plan, with HTTPS included and no server to look after. One SQLite-backed
+Durable Object holds the database, the frontend is served as static assets, and a Durable Object alarm sends the
+expiry alerts.
+
+```sh
+npm install
+npx wrangler secret put SHELFIE_SETUP_TOKEN   # after the first deploy
+npm run deploy:worker                         # builds the frontend, then wrangler deploy
+```
+
+Set the name and the `routes` entry in `wrangler.jsonc` to your own domain (or delete `routes` to use the
+`workers.dev` address). Setup, households and members work as above. Optional variables (`SHELFIE_VAPID_SUBJECT`,
+`SHELFIE_NTFY_URL`, `SHELFIE_WEBHOOK_URL`) go in `vars` in `wrangler.jsonc`.
+
+Worker requests have a small CPU budget, so the Worker runs in **client password mode**: the browser stretches the
+password with PBKDF2 (600,000 iterations) and the server stores only a salted hash of that. The Docker image keeps
+hashing on the server with scrypt. Anyone calling the API directly in client mode has to send that stretched value
+as `password`; see `web/src/kdf.ts`. Backups are Cloudflare's 30-day point-in-time recovery for Durable Objects, not
+the script above.
 
 ## Develop
 

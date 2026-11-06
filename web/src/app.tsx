@@ -433,6 +433,7 @@ function Settings() {
     <>
       <Notifications />
       {h?.role === "owner" && <HouseholdSettings h={h} />}
+      <ChangePassword />
       <section class="card">
         <h2>This device</h2>
         <p class="muted">Signed in as {s.me!.username}. {s.lastSynced ? `Last synced ${new Date(s.lastSynced).toLocaleString()}.` : ""}</p>
@@ -447,6 +448,38 @@ function Settings() {
       </section>
       <TzList />
     </>
+  );
+}
+
+function ChangePassword() {
+  const s = useApp();
+  const [f, setF] = useState({ current: "", next: "", again: "" });
+  const [busy, setBusy] = useState(false);
+  async function submit(e: Event) {
+    e.preventDefault();
+    if (f.next !== f.again) return toast("The new passwords do not match");
+    setBusy(true);
+    try {
+      const u = s.me!.username;
+      await api("/api/me/password", { method: "POST", body: { current_password: await protectPassword(u, f.current), new_password: await protectPassword(u, f.next) } });
+      setF({ current: "", next: "", again: "" });
+      toast("Password changed. Other devices are signed out.");
+    } catch (err) {
+      toast(errMsg(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section class="card">
+      <h2>Change password</h2>
+      <form class="stack" onSubmit={submit}>
+        <label>Current password<input type="password" value={f.current} onInput={(e) => setF({ ...f, current: val(e) })} required autocomplete="current-password" /></label>
+        <label>New password<input type="password" value={f.next} onInput={(e) => setF({ ...f, next: val(e) })} required minLength={8} autocomplete="new-password" /></label>
+        <label>New password again<input type="password" value={f.again} onInput={(e) => setF({ ...f, again: val(e) })} required minLength={8} autocomplete="new-password" /></label>
+        <button disabled={busy}>{busy ? "Changing…" : "Change password"}</button>
+      </form>
+    </section>
   );
 }
 

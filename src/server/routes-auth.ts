@@ -1,5 +1,5 @@
 import type { Context, Hono } from "hono";
-import { deleteCookie, setCookie } from "hono/cookie";
+import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { sendTest } from "./alerts.ts";
 import type { Ctx, Env } from "./context.ts";
 import { HttpError } from "./context.ts";
@@ -102,6 +102,23 @@ export function registerAuthRoutes(app: Hono<Env>, ctx: Ctx): void {
   app.get("/api/me", auth, (c) => {
     const user = c.get("user");
     return c.json({ ...user, households: householdsFor(ctx, user.id) });
+  });
+
+  // Signs every other device out, so a leaked password cannot keep a session alive after it is changed.
+  // A wrong current password is a 403, not a 401: a 401 would send the app back to the login screen.
+  app.post("/api/me/password", auth, limit, async (c) => {
+    const user = c.get("user");
+    const body = await readBody(c);
+    const current = typeof body.current_password === "string" ? body.current_password : "";
+    const next = str(body, "new_password", 8, 200);
+    const row = ctx.db.prepare("SELECT password_hash FROM users WHERE id = ?").get(user.id) as { password_hash: string };
+    if (!verifyPassword(current, row.password_hash)) throw new HttpError(403, "Current password is incorrect");
+    const keep = sha256(getCookie(c, SESSION_COOKIE) ?? "");
+    ctx.db.transaction(() => {
+      ctx.db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(hashPassword(next, ctx.passwordMode), user.id);
+      ctx.db.prepare("DELETE FROM sessions WHERE user_id = ? AND token_hash <> ?").run(user.id, keep);
+    });
+    return c.json({ ok: true });
   });
 
   app.post("/api/households", auth, async (c) => {
