@@ -59,9 +59,22 @@ kept (`SHELFIE_BACKUP_KEEP` to change). Restore by stopping the container and co
 
 ### On Cloudflare Workers
 
-Shelfie also runs on Cloudflare's free plan, with HTTPS included and no server to look after. One SQLite-backed
-Durable Object holds the database, the frontend is served as static assets, and a Durable Object alarm sends the
-expiry alerts.
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/solomon234/shelfie)
+
+One click puts your own copy of Shelfie on your own free Cloudflare account, with HTTPS included and no server to
+look after. You need a Cloudflare account and a GitHub account. Cloudflare copies this repository into your GitHub,
+builds it, and asks for one value: a **setup token**. Make one up (or run `openssl rand -hex 16`) and keep it. When the
+deploy finishes, open the `*.workers.dev` address, choose **First time? Set up this instance**, and enter the token
+plus your admin account. Then install it on your phone from the browser menu.
+
+The free plan covers a household or a few; Cloudflare stops serving (it does not bill you) if a day's limit runs out.
+Your copy is an ordinary repository, so to update it, merge this repository's changes into yours and Cloudflare
+redeploys.
+
+Under the hood, one SQLite-backed Durable Object holds the database, the frontend is served as static assets, and a
+Durable Object alarm sends the expiry alerts.
+
+To deploy by hand instead:
 
 ```sh
 npm install
@@ -69,9 +82,9 @@ npx wrangler secret put SHELFIE_SETUP_TOKEN   # after the first deploy
 npm run deploy:worker                         # builds the frontend, then wrangler deploy
 ```
 
-Set the name and the `routes` entry in `wrangler.jsonc` to your own domain (or delete `routes` to use the
-`workers.dev` address). Setup, households and members work as above. Optional variables (`SHELFIE_VAPID_SUBJECT`,
-`SHELFIE_NTFY_URL`, `SHELFIE_WEBHOOK_URL`) go in `vars` in `wrangler.jsonc`.
+**Your own domain:** copy `wrangler.jsonc` to `wrangler.local.jsonc` (git-ignored), add
+`"routes": [{ "pattern": "shelfie.example.com", "custom_domain": true }]`, and deploy with `npm run deploy:local`.
+Optional variables (`SHELFIE_VAPID_SUBJECT`, `SHELFIE_NTFY_URL`, `SHELFIE_WEBHOOK_URL`) go in `vars` in the config.
 
 Worker requests have a small CPU budget, so the Worker runs in **client password mode**: the browser stretches the
 password with PBKDF2 (600,000 iterations) and the server stores only a salted hash of that. The Docker image keeps

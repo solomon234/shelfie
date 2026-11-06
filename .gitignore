@@ -9,3 +9,4 @@ _bmad-output/
 .wrangler/
 .dev.vars
 worker-configuration.d.ts
+wrangler.local.jsonc

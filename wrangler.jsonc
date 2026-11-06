@@ -8,7 +8,6 @@
     "not_found_handling": "single-page-application",
     "run_worker_first": ["/api/*"]
   },
-  "routes": [{ "pattern": "shelfie.solomonmuratov.com", "custom_domain": true }],
   "durable_objects": { "bindings": [{ "name": "SHELFIE", "class_name": "Shelfie" }] },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Shelfie"] }]
 }

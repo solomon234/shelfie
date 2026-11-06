@@ -1,0 +1,2 @@
+# Needed once, to create the first account. Make one up, or run: openssl rand -hex 16
+SHELFIE_SETUP_TOKEN=
