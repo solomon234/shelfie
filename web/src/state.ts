@@ -3,6 +3,7 @@ import { localParts, daysBetween } from "../../src/shared/dates.ts";
 import { ApiError, NetworkError, api, cachedGet, store } from "./api.ts";
 import { overlayLots, overlayShopping, type Lot, type LocationRef, type ShoppingItem } from "./overlay.ts";
 import type { Notice, OpType, QueuedOp } from "./store.ts";
+import { protectPassword } from "./kdf.ts";
 import { resyncPush } from "./push.ts";
 import { replay } from "./sync.ts";
 
@@ -173,7 +174,8 @@ export async function boot(): Promise<void> {
 }
 
 export async function signIn(path: "/api/login" | "/api/setup", body: Record<string, unknown>): Promise<void> {
-  await api(path, { method: "POST", body });
+  const password = await protectPassword(String(body.username ?? ""), String(body.password ?? ""));
+  await api(path, { method: "POST", body: { ...body, password } });
   await boot();
 }
 

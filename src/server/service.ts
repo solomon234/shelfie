@@ -14,18 +14,6 @@ export interface OpResult {
   floored?: boolean;
 }
 
-export function tx<T>(ctx: Ctx, fn: () => T): T {
-  ctx.db.exec("BEGIN IMMEDIATE");
-  try {
-    const r = fn();
-    ctx.db.exec("COMMIT");
-    return r;
-  } catch (e) {
-    ctx.db.exec("ROLLBACK");
-    throw e;
-  }
-}
-
 function seen(ctx: Ctx, hid: number, clientId: string | undefined): OpResult | null {
   if (!clientId) return null;
   const row = ctx.db.prepare("SELECT result FROM applied_ops WHERE household_id = ? AND client_id = ?").get(hid, clientId) as { result: string } | undefined;
@@ -66,7 +54,7 @@ export async function addLot(ctx: Ctx, hid: number, userId: number, input: AddLo
   const productId = await resolveProduct(ctx, input);
   // The category belongs to the product, so the last choice is what the next add pre-selects.
   if (input.category) ctx.db.prepare("UPDATE products SET category = ? WHERE id = ? AND category <> ?").run(input.category, productId, input.category);
-  return tx(ctx, () => {
+  return ctx.db.transaction(() => {
     const again = seen(ctx, hid, input.client_id);
     if (again) return again;
     const lot = Number(
@@ -82,7 +70,7 @@ export async function addLot(ctx: Ctx, hid: number, userId: number, input: AddLo
 
 // Applies a decrement. Over-consuming floors at zero (the lot is removed) and a vanished lot is reported, never an error.
 export function consumeLot(ctx: Ctx, hid: number, target: LotTarget, amount: number, clientId?: string): OpResult {
-  return tx(ctx, () => {
+  return ctx.db.transaction(() => {
     const dup = seen(ctx, hid, clientId);
     if (dup) return dup;
     const lot = findLot(ctx, hid, target);
@@ -101,7 +89,7 @@ export function consumeLot(ctx: Ctx, hid: number, target: LotTarget, amount: num
 }
 
 export function moveLot(ctx: Ctx, hid: number, target: LotTarget, locationId: number, clientId?: string): OpResult {
-  return tx(ctx, () => {
+  return ctx.db.transaction(() => {
     const dup = seen(ctx, hid, clientId);
     if (dup) return dup;
     const loc = ctx.db.prepare("SELECT id FROM locations WHERE id = ? AND household_id = ?").get(locationId, hid);
@@ -119,7 +107,7 @@ export function moveLot(ctx: Ctx, hid: number, target: LotTarget, locationId: nu
 }
 
 export function addShopping(ctx: Ctx, hid: number, input: { client_id?: string; name: string; quantity: number; unit: string }): OpResult {
-  return tx(ctx, () => {
+  return ctx.db.transaction(() => {
     const dup = seen(ctx, hid, input.client_id);
     if (dup) return dup;
     const item = Number(
@@ -143,7 +131,7 @@ function findItem(ctx: Ctx, hid: number, t: ItemTarget): { id: number; checked: 
 }
 
 export function toggleShopping(ctx: Ctx, hid: number, target: ItemTarget, clientId?: string): OpResult {
-  return tx(ctx, () => {
+  return ctx.db.transaction(() => {
     const dup = seen(ctx, hid, clientId);
     if (dup) return dup;
     const item = findItem(ctx, hid, target);
@@ -159,7 +147,7 @@ export function toggleShopping(ctx: Ctx, hid: number, target: ItemTarget, client
 }
 
 export function deleteShopping(ctx: Ctx, hid: number, target: ItemTarget, clientId?: string): OpResult {
-  return tx(ctx, () => {
+  return ctx.db.transaction(() => {
     const dup = seen(ctx, hid, clientId);
     if (dup) return dup;
     const item = findItem(ctx, hid, target);

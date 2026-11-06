@@ -5,16 +5,17 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { DatabaseSync } from "node:sqlite";
 import { createApp } from "./app.ts";
-import { migrate, openDb } from "./db.ts";
+import { migrate, NodeDb, openDb, type Db } from "./db.ts";
+import { serveSpa } from "./static.ts";
 import { MIGRATIONS } from "./migrations.ts";
 
-function seedHousehold(db: DatabaseSync, name = "Home") {
+function seedHousehold(db: Db, name = "Home") {
   const h = Number(db.prepare("INSERT INTO households(name) VALUES (?)").run(name).lastInsertRowid);
   const l = Number(db.prepare("INSERT INTO locations(household_id,name) VALUES (?,?)").run(h, "Pantry").lastInsertRowid);
   const p = Number(db.prepare("INSERT INTO products(name,name_key) VALUES (?,?)").run(`Beans ${name}`, `beans ${name}`).lastInsertRowid);
   return { h, l, p };
 }
-const insertLot = (db: DatabaseSync, h: number, l: number, p: number, q = 1, exp: string | null = null, cid: string | null = null) =>
+const insertLot = (db: Db, h: number, l: number, p: number, q = 1, exp: string | null = null, cid: string | null = null) =>
   db
     .prepare("INSERT INTO lots(household_id,location_id,product_id,quantity,expires_on,client_id) VALUES (?,?,?,?,?,?)")
     .run(h, l, p, q, exp, cid);
@@ -38,14 +39,14 @@ test("migrating an existing file keeps its data", () => {
 });
 
 test("a failed migration rolls back and leaves the version unchanged", () => {
-  const db = new DatabaseSync(":memory:");
+  const db = new NodeDb(new DatabaseSync(":memory:"));
   assert.throws(() => migrate(db, ["CREATE TABLE a(x);", "CREATE TABLE b(x); CREATE TABLE a(x);"]));
   assert.equal((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version, 1);
   assert.equal(db.prepare("SELECT name FROM sqlite_master WHERE name='b'").get(), undefined);
 });
 
 test("refuses a database newer than the code", () => {
-  const db = new DatabaseSync(":memory:");
+  const db = new NodeDb(new DatabaseSync(":memory:"));
   db.exec("PRAGMA user_version = 99");
   assert.throws(() => migrate(db), /newer than this build/);
 });
@@ -115,7 +116,7 @@ test("static serving: app shell, SPA fallback, real 404s, no traversal, API not 
   writeFileSync(join(root, "index.html"), "<html>shell</html>");
   writeFileSync(join(root, "assets", "app.js"), "console.log(1)");
   writeFileSync(join(root, "manifest.webmanifest"), "{}");
-  const app = createApp(openDb(":memory:"), { staticRoot: root });
+  const app = createApp(openDb(":memory:"), { serveStatic: serveSpa(root) });
 
   const index = await app.request("/");
   assert.equal(index.status, 200);
@@ -136,4 +137,18 @@ test("static serving: app shell, SPA fallback, real 404s, no traversal, API not 
   assert.ok(!(await encoded.text()).includes("root:"));
   assert.equal((await app.request("/api/nope")).status, 404);
   assert.match((await app.request("/api/nope")).headers.get("content-type") ?? "", /json/);
+});
+
+test("nested transactions join the outer one and a throw rolls everything back", () => {
+  const db = openDb(":memory:");
+  assert.throws(() =>
+    db.transaction(() => {
+      db.prepare("INSERT INTO households(name) VALUES ('a')").run();
+      db.transaction(() => db.prepare("INSERT INTO households(name) VALUES ('b')").run());
+      throw new Error("boom");
+    }),
+  );
+  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM households").get() as { n: number }).n, 0);
+  db.transaction(() => db.prepare("INSERT INTO households(name) VALUES ('c')").run());
+  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM households").get() as { n: number }).n, 1);
 });

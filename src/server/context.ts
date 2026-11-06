@@ -1,4 +1,6 @@
-import type { DatabaseSync } from "node:sqlite";
+import type { Db } from "./db-core.ts";
+
+export type PasswordMode = "server" | "client";
 
 export interface PushTarget {
   endpoint: string;
@@ -10,8 +12,12 @@ export interface PushTarget {
 export type PushSender = (target: PushTarget, payload: string) => Promise<"ok" | "gone" | "error">;
 
 export interface Ctx {
-  db: DatabaseSync;
+  db: Db;
   setupToken?: string;
+  // "server": the browser sends the password and the server hashes it with scrypt (self-hosted default).
+  // "client": the browser stretches it first (PBKDF2) and the server only stores a salted hash of that, which
+  // keeps login cheap enough for runtimes with a tiny CPU budget (Cloudflare Workers).
+  passwordMode: PasswordMode;
   now: () => Date;
   fetch: typeof fetch;
   userAgent: string;

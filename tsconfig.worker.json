@@ -1,0 +1,24 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": [
+      "ES2023"
+    ],
+    "types": [
+      "node"
+    ]
+  },
+  "include": [
+    "worker-configuration.d.ts",
+    "src/worker",
+    "src/server"
+  ],
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/server/helpers.test-util.ts",
+    "src/server/index.ts",
+    "src/server/static.ts",
+    "src/server/backup.ts",
+    "src/server/db.ts"
+  ]
+}

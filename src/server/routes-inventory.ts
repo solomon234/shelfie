@@ -3,7 +3,7 @@ import type { Ctx, Env } from "./context.ts";
 import { HttpError } from "./context.ts";
 import { requireAuth, roleIn } from "./auth.ts";
 import { lookupProduct, requireBarcode } from "./barcode.ts";
-import { addLot, addShopping, consumeLot, dashboard, deleteShopping, listLots, moveLot, toggleShopping, tx } from "./service.ts";
+import { addLot, addShopping, consumeLot, dashboard, deleteShopping, listLots, moveLot, toggleShopping } from "./service.ts";
 import { id, isoDate, num, optCategory, optNum, optStr, readBody, str } from "./validate.ts";
 
 const clientId = (b: Record<string, unknown>) => optStr(b, "client_id", 80) ?? undefined;
@@ -126,7 +126,7 @@ export function registerInventoryRoutes(app: Hono<Env>, ctx: Ctx): void {
       .get(id(c.req.param("lotId"), "lot"), hid) as { name: string; unit: string } | undefined;
     if (!lot) throw new HttpError(404, "Lot not found");
     return c.json(
-      tx(ctx, () => {
+      ctx.db.transaction(() => {
         const open = ctx.db.prepare("SELECT id FROM shopping_items WHERE household_id = ? AND checked = 0 AND lower(name) = lower(?)").get(hid, lot.name) as { id: number } | undefined;
         if (open) {
           ctx.db.prepare("UPDATE shopping_items SET quantity = quantity + 1 WHERE id = ?").run(open.id);

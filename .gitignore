@@ -6,3 +6,6 @@ data/
 .env
 _bmad/
 _bmad-output/
+.wrangler/
+.dev.vars
+worker-configuration.d.ts

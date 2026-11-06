@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
-import type { DatabaseSync } from "node:sqlite";
 import webpush from "web-push";
 import type { Ctx, PushSender } from "./context.ts";
+import type { Db } from "./db-core.ts";
 
 // The server POSTs to whatever endpoint a device registers, so only real push services are accepted.
 // Otherwise a household member could point the server at an address on the home network.
@@ -31,7 +31,7 @@ export interface VapidKeys {
 }
 
 // Generated once and kept in the database, so devices stay subscribed across restarts and upgrades.
-export function vapidKeys(db: DatabaseSync): VapidKeys {
+export function vapidKeys(db: Db): VapidKeys {
   const get = (k: string) => (db.prepare("SELECT value FROM settings WHERE key = ?").get(k) as { value: string } | undefined)?.value;
   const publicKey = get("vapid_public");
   const privateKey = get("vapid_private");
@@ -43,7 +43,7 @@ export function vapidKeys(db: DatabaseSync): VapidKeys {
   return fresh;
 }
 
-export function makeWebPushSender(db: DatabaseSync, subject: string): PushSender {
+export function makeWebPushSender(db: Db, subject: string): PushSender {
   let keys: VapidKeys | undefined;
   return async (target, payload) => {
     keys ??= vapidKeys(db);

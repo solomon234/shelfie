@@ -13,8 +13,10 @@
     "dev:web": "vite",
     "build": "vite build",
     "start": "node src/server/index.ts",
-    "typecheck": "tsc --noEmit",
-    "test": "node --test \"src/**/*.test.ts\" \"web/src/**/*.test.ts\""
+    "typecheck": "wrangler types >/dev/null && tsc --noEmit && tsc --noEmit -p tsconfig.worker.json",
+    "test": "node --test \"src/**/*.test.ts\" \"web/src/**/*.test.ts\"",
+    "dev:worker": "npm run build && wrangler dev",
+    "deploy:worker": "npm run build && wrangler deploy"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.6",
@@ -30,6 +32,7 @@
     "@types/web-push": "^3.6.4",
     "fake-indexeddb": "^6.2.7",
     "typescript": "^7.0.2",
-    "vite": "^8.3.6"
+    "vite": "^8.3.6",
+    "wrangler": "^4.158.0"
   }
 }

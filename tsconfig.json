@@ -11,7 +11,17 @@
     "jsx": "react-jsx",
     "jsxImportSource": "preact",
     "skipLibCheck": true,
-    "lib": ["ES2023", "DOM"]
+    "lib": [
+      "ES2023",
+      "DOM"
+    ]
   },
-  "include": ["src", "web/src", "vite.config.ts"]
+  "include": [
+    "src",
+    "web/src",
+    "vite.config.ts"
+  ],
+  "exclude": [
+    "src/worker"
+  ]
 }

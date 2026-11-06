@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createApp } from "./app.ts";
+import { hashPassword, verifyPassword } from "./auth.ts";
 import { openDb } from "./db.ts";
 import { TOKEN, client, loginAs, setupInstance, testApp } from "./helpers.test-util.ts";
 
@@ -38,7 +39,8 @@ test("setup creates the admin once and never again", async () => {
 
 test("the public surface does not reveal whether setup is pending", async () => {
   const fresh = await testApp().client().json("GET", "/api/health");
-  assert.deepEqual(Object.keys(fresh.body).sort(), ["ok", "version"]);
+  // `auth` only names the password mode ("server" or "client"); nothing here depends on whether setup happened.
+  assert.deepEqual(Object.keys(fresh.body).sort(), ["auth", "ok", "version"]);
 });
 
 test("passwords and session tokens are stored hashed", async () => {
@@ -179,4 +181,28 @@ test("malformed bodies are 400, not 500", async () => {
   const t = testApp();
   const res = await t.app.request("/api/login", { method: "POST", headers: { "content-type": "application/json" }, body: "{nope" });
   assert.equal(res.status, 400);
+});
+
+test("client mode stores a salted hash of the browser's proof and logs in with it", async () => {
+  const t = testApp({ passwordMode: "client" });
+  const c = t.client();
+  const proof = "p".repeat(43);
+  assert.equal((await c.json("GET", "/api/health")).body.auth, "client");
+  assert.equal((await setupInstance(c, { password: proof })).status, 200);
+  const u = t.db.prepare("SELECT password_hash FROM users").get() as { password_hash: string };
+  assert.ok(u.password_hash.startsWith("proof$"));
+  assert.ok(!u.password_hash.includes(proof));
+
+  const ok = t.client();
+  assert.equal((await ok.json("POST", "/api/login", { username: "admin", password: proof })).status, 200);
+  const bad = t.client();
+  assert.equal((await bad.json("POST", "/api/login", { username: "admin", password: "q".repeat(43) })).status, 401);
+  assert.equal((await bad.json("POST", "/api/login", { username: "nobody", password: proof })).status, 401);
+});
+
+test("an existing scrypt hash still verifies when the server runs in client mode", () => {
+  const stored = hashPassword("hunter2hunter2", "server");
+  assert.ok(stored.startsWith("scrypt$"));
+  assert.ok(verifyPassword("hunter2hunter2", stored));
+  assert.ok(!verifyPassword("wrong", stored));
 });

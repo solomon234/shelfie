@@ -6,6 +6,7 @@ import { HttpError } from "./context.ts";
 import {
   SESSION_COOKIE,
   createSession,
+  dummyHash,
   hashPassword,
   rateLimit,
   requireAuth,
@@ -39,18 +40,6 @@ function createHousehold(ctx: Ctx, userId: number, name: string, tz: string): nu
   return h;
 }
 
-function tx<T>(ctx: Ctx, fn: () => T): T {
-  ctx.db.exec("BEGIN IMMEDIATE");
-  try {
-    const r = fn();
-    ctx.db.exec("COMMIT");
-    return r;
-  } catch (e) {
-    ctx.db.exec("ROLLBACK");
-    throw e;
-  }
-}
-
 function householdsFor(ctx: Ctx, userId: number) {
   const rows = ctx.db
     .prepare(
@@ -74,11 +63,11 @@ export function registerAuthRoutes(app: Hono<Env>, ctx: Ctx): void {
     const password = str(body, "password", 8, 200);
     const householdName = str(body, "household_name", 1, 80);
     const tz = timezone(optStr(body, "timezone", 64) ?? "UTC");
-    const userId = tx(ctx, () => {
+    const userId = ctx.db.transaction(() => {
       const { n } = ctx.db.prepare("SELECT COUNT(*) AS n FROM users").get() as { n: number };
       if (n > 0) throw new HttpError(409, "This instance is already set up");
       const u = Number(
-        ctx.db.prepare("INSERT INTO users(username,password_hash,is_admin) VALUES (?,?,1)").run(username, hashPassword(password)).lastInsertRowid,
+        ctx.db.prepare("INSERT INTO users(username,password_hash,is_admin) VALUES (?,?,1)").run(username, hashPassword(password, ctx.passwordMode)).lastInsertRowid,
       );
       createHousehold(ctx, u, householdName, tz);
       return u;
@@ -95,7 +84,7 @@ export function registerAuthRoutes(app: Hono<Env>, ctx: Ctx): void {
       | { id: number; password_hash: string }
       | undefined;
     // Always run a hash comparison so response time does not reveal valid usernames.
-    const ok = verifyPassword(password, row?.password_hash ?? "scrypt$AAAAAAAAAAAAAAAAAAAAAA$" + "A".repeat(86));
+    const ok = verifyPassword(password, row?.password_hash ?? dummyHash(ctx.passwordMode));
     if (!row || !ok) throw new HttpError(401, "Invalid username or password");
     startSession(c, ctx, row.id);
     return c.json({ ok: true });
@@ -121,7 +110,7 @@ export function registerAuthRoutes(app: Hono<Env>, ctx: Ctx): void {
     const body = await readBody(c);
     const name = str(body, "name", 1, 80);
     const tz = timezone(optStr(body, "timezone", 64) ?? "UTC");
-    const hid = tx(ctx, () => createHousehold(ctx, user.id, name, tz));
+    const hid = ctx.db.transaction(() => createHousehold(ctx, user.id, name, tz));
     return c.json({ id: hid, name }, 201);
   });
 
@@ -172,7 +161,7 @@ export function registerAuthRoutes(app: Hono<Env>, ctx: Ctx): void {
     let userId = existing?.id;
     if (!userId) {
       userId = Number(
-        ctx.db.prepare("INSERT INTO users(username,password_hash) VALUES (?,?)").run(username, hashPassword(str(body, "password", 8, 200))).lastInsertRowid,
+        ctx.db.prepare("INSERT INTO users(username,password_hash) VALUES (?,?)").run(username, hashPassword(str(body, "password", 8, 200), ctx.passwordMode)).lastInsertRowid,
       );
     }
     ctx.db.prepare("INSERT INTO memberships(user_id,household_id,role) VALUES (?,?,?) ON CONFLICT(user_id,household_id) DO UPDATE SET role = excluded.role").run(userId, hid, role);

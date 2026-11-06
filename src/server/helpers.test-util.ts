@@ -1,5 +1,5 @@
 import type { Hono } from "hono";
-import { createApp } from "./app.ts";
+import { createApp, type AppOptions } from "./app.ts";
 import { openDb } from "./db.ts";
 import type { Env } from "./context.ts";
 
@@ -35,7 +35,7 @@ export function client(app: Hono<Env>): Client {
   return c;
 }
 
-export function testApp(opts: { now?: () => Date; fetch?: typeof fetch } = {}) {
+export function testApp(opts: Pick<AppOptions, "now" | "fetch" | "passwordMode"> = {}) {
   const db = openDb(":memory:");
   const app = createApp(db, { setupToken: TOKEN, ...opts });
   return { db, app, client: () => client(app) };

@@ -4,6 +4,7 @@ import { serve } from "@hono/node-server";
 import { startAlertScheduler } from "./alerts.ts";
 import { createApp } from "./app.ts";
 import { openDb } from "./db.ts";
+import { serveSpa } from "./static.ts";
 
 function fail(message: string): never {
   console.error(`shelfie: ${message}`);
@@ -30,7 +31,9 @@ if (!apiOnly && !existsSync(resolve(staticRoot, "index.html"))) {
 
 const db = openDb(dbPath);
 const app = createApp(db, {
-  staticRoot: apiOnly ? undefined : staticRoot,
+  serveStatic: apiOnly ? undefined : serveSpa(staticRoot),
+  vapidSubject: process.env.SHELFIE_VAPID_SUBJECT,
+  userAgent: process.env.OFF_USER_AGENT,
   setupToken: process.env.SHELFIE_SETUP_TOKEN,
   defaultTargets: { ntfy: process.env.SHELFIE_NTFY_URL, webhook: process.env.SHELFIE_WEBHOOK_URL },
 });

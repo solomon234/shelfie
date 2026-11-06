@@ -120,9 +120,12 @@ export async function runAlertCheck(ctx: Ctx): Promise<{ households: number; ale
   return { households: households.length, alerted };
 }
 
+// Periodic work shared by the Node timer below and the Worker's Durable Object alarm.
+export const runBackgroundChecks = (ctx: Ctx) =>
+  Promise.all([runAlertCheck(ctx), resolvePendingProducts(ctx)]).catch((e) => console.error("shelfie: background check failed", e));
+
 export function startAlertScheduler(ctx: Ctx, everyMs = 5 * 60_000): NodeJS.Timeout {
-  const tick = () =>
-    Promise.all([runAlertCheck(ctx), resolvePendingProducts(ctx)]).catch((e) => console.error("shelfie: background check failed", e));
+  const tick = () => runBackgroundChecks(ctx);
   setTimeout(tick, 15_000).unref();
   const timer = setInterval(tick, everyMs);
   timer.unref();

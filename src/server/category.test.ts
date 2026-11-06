@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { DatabaseSync } from "node:sqlite";
 import { runAlertCheck } from "./alerts.ts";
-import { migrate } from "./db.ts";
+import { migrate, NodeDb } from "./db.ts";
 import { MIGRATIONS } from "./migrations.ts";
 import { CATEGORIES, CATEGORY_INFO, isCategory } from "../shared/categories.ts";
 import { setupInstance, testApp } from "./helpers.test-util.ts";
@@ -34,7 +34,7 @@ test("every category has a label, a date label and presets, and the list is the 
 });
 
 test("migration 3 adds the column, defaults existing products to food, and rejects bad values", () => {
-  const db = new DatabaseSync(":memory:");
+  const db = new NodeDb(new DatabaseSync(":memory:"));
   db.exec("PRAGMA foreign_keys = ON");
   migrate(db, MIGRATIONS.slice(0, 2));
   db.prepare("INSERT INTO products(name,name_key) VALUES ('Old milk','old milk')").run();

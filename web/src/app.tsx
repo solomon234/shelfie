@@ -3,6 +3,7 @@ import { lazy, Suspense } from "preact/compat";
 import { CATEGORIES, CATEGORY_INFO, isCategory, type Category } from "../../src/shared/categories.ts";
 import { localParts } from "../../src/shared/dates.ts";
 import { ApiError, api, store } from "./api.ts";
+import { protectPassword } from "./kdf.ts";
 import type { Lot } from "./overlay.ts";
 import { disablePush, enablePush, pushState, sendTestPush, type PushState } from "./push.ts";
 import {
@@ -523,7 +524,7 @@ function HouseholdSettings({ h }: { h: Household }) {
   async function addMember(e: Event) {
     e.preventDefault();
     try {
-      await api(`/api/households/${h.id}/members`, { method: "POST", body: nm });
+      await api(`/api/households/${h.id}/members`, { method: "POST", body: { ...nm, password: await protectPassword(nm.username, nm.password) } });
       setNm({ username: "", password: "", role: "member" });
       await loadMembers();
       toast("Member added");

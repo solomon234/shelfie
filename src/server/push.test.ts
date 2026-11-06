@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { DatabaseSync } from "node:sqlite";
 import { runAlertCheck } from "./alerts.ts";
 import type { PushTarget } from "./context.ts";
-import { migrate, openDb } from "./db.ts";
+import { migrate, NodeDb, openDb } from "./db.ts";
 import { MIGRATIONS } from "./migrations.ts";
 import { isPushEndpoint, vapidKeys } from "./push.ts";
 import { loginAs, setupInstance, testApp } from "./helpers.test-util.ts";
@@ -63,7 +63,7 @@ test("the VAPID key pair is created once and survives restarts", () => {
 });
 
 test("migration 2 upgrades an existing v1 database without losing data", () => {
-  const db = new DatabaseSync(":memory:");
+  const db = new NodeDb(new DatabaseSync(":memory:"));
   db.exec("PRAGMA foreign_keys = ON");
   migrate(db, [MIGRATIONS[0]!]);
   db.prepare("INSERT INTO households(name) VALUES ('Keep')").run();

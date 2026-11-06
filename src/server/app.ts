@@ -1,36 +1,40 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
-import type { DatabaseSync } from "node:sqlite";
-import type { Ctx, Env } from "./context.ts";
+import type { MiddlewareHandler } from "hono";
+import type { Ctx, Env, PasswordMode } from "./context.ts";
+import type { Db } from "./db-core.ts";
 import { HttpError } from "./context.ts";
 import { registerAuthRoutes } from "./routes-auth.ts";
 import { makeWebPushSender } from "./push.ts";
 import { registerInventoryRoutes } from "./routes-inventory.ts";
 import { registerPushRoutes } from "./routes-push.ts";
 import { registerSyncRoutes } from "./routes-sync.ts";
-import { serveSpa } from "./static.ts";
 
 export const VERSION = "0.3.0";
 
 export interface AppOptions {
-  // Directory of the built frontend. When omitted the app is API-only.
-  staticRoot?: string;
+  // Serves the built frontend after the API routes. When omitted the app is API-only.
+  serveStatic?: MiddlewareHandler;
   setupToken?: string;
+  passwordMode?: PasswordMode;
+  vapidSubject?: string;
+  userAgent?: string;
   now?: () => Date;
   fetch?: typeof fetch;
   defaultTargets?: { ntfy?: string; webhook?: string };
   sendPush?: Ctx["sendPush"];
 }
 
-export function createApp(db: DatabaseSync, options: AppOptions = {}) {
+export function createApp(db: Db, options: AppOptions = {}) {
   const ctx: Ctx = {
     db,
     setupToken: options.setupToken,
+    passwordMode: options.passwordMode ?? "server",
     now: options.now ?? (() => new Date()),
     fetch: options.fetch ?? fetch,
     defaultTargets: options.defaultTargets ?? {},
-    sendPush: options.sendPush ?? makeWebPushSender(db, process.env.SHELFIE_VAPID_SUBJECT ?? "mailto:admin@shelfie.local"),
-    userAgent: process.env.OFF_USER_AGENT ?? `Shelfie/${VERSION} (self-hosted pantry tracker)`,
+    sendPush: options.sendPush ?? makeWebPushSender(db, options.vapidSubject ?? "mailto:admin@shelfie.local"),
+    userAgent: options.userAgent ?? `Shelfie/${VERSION} (self-hosted pantry tracker)`,
   };
   const app = new Hono<Env>();
 
@@ -52,7 +56,7 @@ export function createApp(db: DatabaseSync, options: AppOptions = {}) {
 
   app.get("/api/health", (c) => {
     db.prepare("SELECT 1").get();
-    return c.json({ ok: true, version: VERSION });
+    return c.json({ ok: true, version: VERSION, auth: ctx.passwordMode });
   });
 
   registerAuthRoutes(app, ctx);
@@ -63,7 +67,7 @@ export function createApp(db: DatabaseSync, options: AppOptions = {}) {
   // Unknown API paths must never fall through to the SPA shell.
   app.all("/api/*", (c) => c.json({ error: "Not found" }, 404));
 
-  if (options.staticRoot) app.use("*", serveSpa(options.staticRoot));
+  if (options.serveStatic) app.use("*", options.serveStatic);
 
   app.onError((err, c) => {
     if (err instanceof HttpError) return c.json({ error: err.message }, err.status as 400);

@@ -1,23 +1,34 @@
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import type { MiddlewareHandler } from "hono";
 import { getCookie } from "hono/cookie";
-import type { Ctx, Env } from "./context.ts";
+import type { Ctx, Env, PasswordMode } from "./context.ts";
 import { HttpError } from "./context.ts";
 
 export const SESSION_COOKIE = "shelfie_session";
 export const SESSION_DAYS = 30;
 
-export function hashPassword(password: string): string {
-  const salt = randomBytes(16);
-  const hash = scryptSync(password, salt, 64);
-  return `scrypt$${salt.toString("base64url")}$${hash.toString("base64url")}`;
+// Stored formats:
+//   scrypt$<salt>$<hash>  "server" mode: the secret is the user's password, hashed here with scrypt.
+//   proof$<salt>$<hash>   "client" mode: the secret is the browser's PBKDF2 output (already slow to guess),
+//                         so a salted SHA-256 is enough and costs almost no CPU.
+export function hashPassword(secret: string, mode: PasswordMode = "server"): string {
+  const salt = randomBytes(16).toString("base64url");
+  if (mode === "client") return `proof$${salt}$${sha256(`${salt}:${secret}`)}`;
+  return `scrypt$${salt}$${scryptSync(secret, Buffer.from(salt, "base64url"), 64).toString("base64url")}`;
 }
 
-export function verifyPassword(password: string, stored: string): boolean {
+// Used for unknown usernames so response time does not reveal which ones exist.
+export function dummyHash(mode: PasswordMode): string {
+  return mode === "client" ? `proof$AAAAAAAAAAAAAAAAAAAAAA$${"0".repeat(64)}` : `scrypt$AAAAAAAAAAAAAAAAAAAAAA$${"A".repeat(86)}`;
+}
+
+export function verifyPassword(secret: string, stored: string): boolean {
   const [kind, salt, hash] = stored.split("$");
-  if (kind !== "scrypt" || !salt || !hash) return false;
+  if (!salt || !hash) return false;
+  if (kind === "proof") return hash.length === 64 && timingSafeEqual(Buffer.from(sha256(`${salt}:${secret}`)), Buffer.from(hash));
+  if (kind !== "scrypt") return false;
   const expected = Buffer.from(hash, "base64url");
-  const actual = scryptSync(password, Buffer.from(salt, "base64url"), expected.length);
+  const actual = scryptSync(secret, Buffer.from(salt, "base64url"), expected.length);
   return timingSafeEqual(actual, expected);
 }
 

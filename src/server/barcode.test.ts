@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { lookupProduct, normalizeBarcode } from "./barcode.ts";
 import type { Ctx } from "./context.ts";
 
-const ctxWith = (fetchImpl: typeof fetch): Ctx => ({ db: null as never, now: () => new Date(), fetch: fetchImpl, userAgent: "Shelfie-test/1.0", defaultTargets: {}, sendPush: async () => "ok" });
+const ctxWith = (fetchImpl: typeof fetch): Ctx => ({ db: null as never, passwordMode: "server", now: () => new Date(), fetch: fetchImpl, userAgent: "Shelfie-test/1.0", defaultTargets: {}, sendPush: async () => "ok" });
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 
 test("UPC-A and the same EAN-13 normalize to one code", () => {
