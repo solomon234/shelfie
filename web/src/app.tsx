@@ -433,6 +433,7 @@ function Settings() {
     <>
       <Notifications />
       {h?.role === "owner" && <HouseholdSettings h={h} />}
+      {s.me!.is_admin && <AdminUsage />}
       {s.me!.is_admin && <AdminAccounts />}
       <ChangePassword />
       <section class="card">
@@ -449,6 +450,45 @@ function Settings() {
       </section>
       <TzList />
     </>
+  );
+}
+
+interface Usage {
+  instance: { accounts: number; households: number; items: number; storage_bytes: number };
+  households: { id: number; name: string; members: number; items: number; shopping_open: number; notification_devices: number; changes_7d: number; last_change: string | null }[];
+}
+
+const ago = (iso: string | null) => {
+  if (!iso) return "no activity yet";
+  const mins = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60_000));
+  if (mins < 60) return `${mins} min ago`;
+  if (mins < 2880) return `${Math.round(mins / 60)} h ago`;
+  return `${Math.round(mins / 1440)} days ago`;
+};
+const size = (bytes: number) => (bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`);
+
+// Instance admins only: a read-only summary of who uses the instance.
+function AdminUsage() {
+  const [u, setU] = useState<Usage | null>(null);
+  const load = () => api<Usage>("/api/admin/usage").then(setU).catch(() => {});
+  useEffect(() => { void load(); }, []);
+  if (!u) return null;
+  return (
+    <section class="card">
+      <h2>Usage</h2>
+      <p class="muted">
+        {u.instance.accounts} accounts · {u.instance.households} households · {u.instance.items} items · database {size(u.instance.storage_bytes)}
+      </p>
+      {u.households.map((h) => (
+        <div class="row">
+          <strong>{h.name}</strong>
+          <small>
+            {h.members} member{h.members === 1 ? "" : "s"} · {h.items} item{h.items === 1 ? "" : "s"} · {h.shopping_open} to buy · {h.changes_7d} change{h.changes_7d === 1 ? "" : "s"} this week · {h.notification_devices} notification device{h.notification_devices === 1 ? "" : "s"} · last change {ago(h.last_change)}
+          </small>
+        </div>
+      ))}
+      <div class="buttons"><button type="button" onClick={() => void load()}>Refresh</button></div>
+    </section>
   );
 }
 

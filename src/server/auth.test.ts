@@ -279,3 +279,33 @@ test("admins can reset another account's password, which signs that account out"
   assert.equal((await t.client().json("POST", "/api/login", { username: "friend", password: "fresh-pass-99" })).status, 200);
   assert.equal((await admin.json("GET", "/api/me")).status, 200); // the admin stays signed in
 });
+
+test("the admin usage view summarizes each household and is admin-only", async () => {
+  const t = testApp();
+  const admin = t.client();
+  await setupInstance(admin);
+  const made = await admin.json("POST", "/api/admin/users", { username: "friend", password: "friend-pass-1", household_name: "Friend's shelf" });
+  const friend = await loginAs(t, "friend", "friend-pass-1");
+  const loc = (await friend.json("GET", `/api/households/${made.body.household_id}/locations`)).body[0].id;
+  await friend.json("POST", `/api/households/${made.body.household_id}/sync`, {
+    ops: [
+      { type: "lot.add", client_id: "u1", location_id: loc, name: "Rice", quantity: 1 },
+      { type: "lot.add", client_id: "u2", location_id: loc, name: "Beans", quantity: 2 },
+      { type: "shopping.add", client_id: "u3", name: "Milk" },
+    ],
+  });
+
+  assert.equal((await friend.json("GET", "/api/admin/usage")).status, 403);
+  assert.equal((await t.client().json("GET", "/api/admin/usage")).status, 401);
+
+  const { body } = await admin.json("GET", "/api/admin/usage");
+  assert.deepEqual(body.instance, { accounts: 2, households: 2, items: 2, storage_bytes: body.instance.storage_bytes });
+  assert.ok(body.instance.storage_bytes > 0);
+  const [first, second] = body.households;
+  assert.equal(first.name, "Friend's shelf"); // most recent activity first
+  assert.deepEqual({ ...first, id: 0, last_change: null }, { id: 0, name: "Friend's shelf", members: 1, items: 2, shopping_open: 1, notification_devices: 0, changes_7d: 3, last_change: null });
+  assert.ok(first.last_change);
+  assert.equal(second.name, "Home");
+  assert.equal(second.items, 0);
+  assert.equal(second.last_change, null);
+});

@@ -49,6 +49,11 @@ export class NodeDb implements Db {
     this.raw.exec(`PRAGMA user_version = ${version}`);
   }
 
+  sizeBytes(): number {
+    const n = (pragma: string) => Object.values(this.raw.prepare(`PRAGMA ${pragma}`).get() as Record<string, number>)[0]!;
+    return n("page_count") * n("page_size");
+  }
+
   close(): void {
     this.raw.close();
   }

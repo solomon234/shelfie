@@ -22,6 +22,8 @@ export interface Db {
   transaction<T>(fn: () => T): T;
   schemaVersion(): number;
   setSchemaVersion(version: number): void;
+  // Bytes the database occupies, for the admin usage view.
+  sizeBytes(): number;
 }
 
 export function migrate(db: Db, migrations: readonly string[] = MIGRATIONS): void {

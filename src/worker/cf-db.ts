@@ -50,6 +50,10 @@ export class DurableObjectDb implements Db {
     return r?.v ?? 0;
   }
 
+  sizeBytes(): number {
+    return this.#sql.databaseSize;
+  }
+
   setSchemaVersion(version: number): void {
     this.#sql.exec("INSERT INTO shelfie_meta(k,v) VALUES ('schema_version',?) ON CONFLICT(k) DO UPDATE SET v = excluded.v", version);
   }

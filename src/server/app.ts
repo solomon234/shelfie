@@ -10,7 +10,7 @@ import { registerInventoryRoutes } from "./routes-inventory.ts";
 import { registerPushRoutes } from "./routes-push.ts";
 import { registerSyncRoutes } from "./routes-sync.ts";
 
-export const VERSION = "0.4.0";
+export const VERSION = "0.5.0";
 
 export interface AppOptions {
   // Serves the built frontend after the API routes. When omitted the app is API-only.

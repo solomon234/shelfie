@@ -145,6 +145,46 @@ export function registerAuthRoutes(app: Hono<Env>, ctx: Ctx): void {
     );
   });
 
+  // High-level numbers per household, so an admin can see who uses the instance and how much room is left.
+  app.get("/api/admin/usage", auth, (c) => {
+    if (!c.get("user").is_admin) throw new HttpError(403, "Only instance admins can do this");
+    const weekAgo = new Date(ctx.now().getTime() - 7 * 86400_000).toISOString().replace(/\.\d{3}Z$/, "Z");
+    type Count = { household_id: number; n: number; last?: string | null; recent?: number };
+    const by = (sql: string, ...p: string[]) => new Map((ctx.db.prepare(sql).all(...p) as Count[]).map((r) => [r.household_id, r]));
+    const members = by("SELECT household_id, COUNT(*) AS n FROM memberships GROUP BY household_id");
+    const lots = by("SELECT household_id, COUNT(*) AS n, MAX(created_at) AS last FROM lots GROUP BY household_id");
+    const shopping = by("SELECT household_id, COUNT(*) AS n FROM shopping_items WHERE checked = 0 GROUP BY household_id");
+    const ops = by("SELECT household_id, COUNT(*) AS n, MAX(created_at) AS last, SUM(created_at >= ?) AS recent FROM applied_ops GROUP BY household_id", weekAgo);
+    const devices = by(
+      "SELECT m.household_id AS household_id, COUNT(DISTINCT ps.id) AS n FROM push_subscriptions ps JOIN memberships m ON m.user_id = ps.user_id GROUP BY m.household_id",
+    );
+    const households = (ctx.db.prepare("SELECT id, name FROM households").all() as { id: number; name: string }[])
+      .map((h) => {
+        const lastChange = [lots.get(h.id)?.last, ops.get(h.id)?.last].filter((x): x is string => Boolean(x)).sort().pop() ?? null;
+        return {
+          id: h.id,
+          name: h.name,
+          members: members.get(h.id)?.n ?? 0,
+          items: lots.get(h.id)?.n ?? 0,
+          shopping_open: shopping.get(h.id)?.n ?? 0,
+          notification_devices: devices.get(h.id)?.n ?? 0,
+          changes_7d: ops.get(h.id)?.recent ?? 0,
+          last_change: lastChange,
+        };
+      })
+      .sort((a, b) => (b.last_change ?? "").localeCompare(a.last_change ?? "") || a.name.localeCompare(b.name));
+    const count = (sql: string) => (ctx.db.prepare(sql).get() as { n: number }).n;
+    return c.json({
+      instance: {
+        accounts: count("SELECT COUNT(*) AS n FROM users"),
+        households: households.length,
+        items: count("SELECT COUNT(*) AS n FROM lots"),
+        storage_bytes: ctx.db.sizeBytes(),
+      },
+      households,
+    });
+  });
+
   app.post("/api/admin/users", auth, async (c) => {
     if (!c.get("user").is_admin) throw new HttpError(403, "Only instance admins can do this");
     const body = await readBody(c);
