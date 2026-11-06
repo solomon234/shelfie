@@ -3,7 +3,7 @@ import type { Ctx, Env } from "./context.ts";
 import { HttpError } from "./context.ts";
 import { requireAuth, roleIn } from "./auth.ts";
 import { lookupProduct, requireBarcode } from "./barcode.ts";
-import { addLot, addShopping, consumeLot, dashboard, deleteShopping, listLots, moveLot, toggleShopping } from "./service.ts";
+import { addLot, addShopping, consumeLot, dashboard, deleteShopping, listLots, moveLot, setCategory, toggleShopping } from "./service.ts";
 import { id, isoDate, num, optCategory, optNum, optStr, readBody, str } from "./validate.ts";
 
 const clientId = (b: Record<string, unknown>) => optStr(b, "client_id", 80) ?? undefined;
@@ -16,11 +16,19 @@ export function registerInventoryRoutes(app: Hono<Env>, ctx: Ctx): void {
     return hid;
   };
 
+  // `?household=<id>` adds that household's own category for the product; without it the category is "food".
   app.get("/api/products/:barcode", auth, async (c) => {
     const code = requireBarcode(c.req.param("barcode"));
-    const local = ctx.db.prepare("SELECT name, brand, image_url, category FROM products WHERE barcode = ? AND resolved = 1").get(code) as
-      | { name: string; brand: string | null; image_url: string | null; category: string }
-      | undefined;
+    const hq = c.req.query("household");
+    const hid = hq === undefined ? null : id(hq, "household");
+    if (hid !== null) roleIn(ctx, c.get("user").id, hid);
+    const local = ctx.db
+      .prepare(
+        `SELECT p.name, p.brand, p.image_url, COALESCE(hc.category, 'food') AS category FROM products p
+         LEFT JOIN household_product_categories hc ON hc.product_id = p.id AND hc.household_id = ?
+         WHERE p.barcode = ? AND p.resolved = 1`,
+      )
+      .get(hid ?? 0, code) as { name: string; brand: string | null; image_url: string | null; category: string } | undefined;
     if (local) return c.json({ found: true, barcode: code, ...local });
     return c.json({ barcode: code, ...(await lookupProduct(ctx, code)) });
   });
@@ -79,8 +87,8 @@ export function registerInventoryRoutes(app: Hono<Env>, ctx: Ctx): void {
     } else if (!ctx.db.prepare("SELECT 1 FROM lots WHERE id = ? AND household_id = ?").get(lotId, hid)) {
       throw new HttpError(404, "Lot not found");
     }
-    // The category is on the product, so it applies to every lot of that product.
-    if (category) ctx.db.prepare("UPDATE products SET category = ? WHERE id = (SELECT product_id FROM lots WHERE id = ?)").run(category, lotId);
+    // The category applies to every lot of that product in this household, and to no other household.
+    if (category) setCategory(ctx, hid, (ctx.db.prepare("SELECT product_id FROM lots WHERE id = ?").get(lotId) as { product_id: number }).product_id, category);
     // A changed expiry date starts a fresh alert cycle for the lot.
     if ("expires_on" in b) ctx.db.prepare("DELETE FROM alert_state WHERE lot_id = ?").run(lotId);
     return c.json({ ok: true });

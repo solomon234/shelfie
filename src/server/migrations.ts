@@ -113,4 +113,18 @@ const V3 = `
 ALTER TABLE products ADD COLUMN category TEXT NOT NULL DEFAULT 'food' CHECK (category IN ('food','medicine','gear','household'));
 `;
 
-export const MIGRATIONS: readonly string[] = [V1, V2, V3];
+// Products are a catalog shared by every household, so the category (a household's own choice) moves out of it.
+// Each household keeps the category it sees today; a product with no row here is "food".
+const V4 = `
+CREATE TABLE household_product_categories (
+  household_id INTEGER NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+  product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  category TEXT NOT NULL CHECK (category IN ('food','medicine','gear','household')),
+  PRIMARY KEY (household_id, product_id)
+);
+INSERT INTO household_product_categories(household_id, product_id, category)
+  SELECT DISTINCT l.household_id, l.product_id, p.category FROM lots l JOIN products p ON p.id = l.product_id WHERE p.category <> 'food';
+UPDATE products SET category = 'food';
+`;
+
+export const MIGRATIONS: readonly string[] = [V1, V2, V3, V4];

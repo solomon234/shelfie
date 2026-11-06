@@ -301,7 +301,7 @@ function ScanScreen({ onClose, onResult }: { onClose(): void; onResult(v: Extrac
     try {
       const code = raw.replace(/\D/g, "");
       try {
-        const p = await api<{ found: boolean; barcode: string; name?: string; brand?: string; image_url?: string; category?: Category }>(`/api/products/${code}`);
+        const p = await api<{ found: boolean; barcode: string; name?: string; brand?: string; image_url?: string; category?: Category }>(`/api/products/${code}?household=${s.householdId}`);
         onResult({ name: "add", barcode: p.barcode, prefill: p.found ? p : undefined });
       } catch (e) {
         if (e instanceof ApiError) return toast(e.message);

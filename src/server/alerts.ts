@@ -93,8 +93,9 @@ export async function runAlertCheck(ctx: Ctx): Promise<{ households: number; ale
     const cutoff = new Date(Date.parse(local.date + "T00:00:00Z") + h.expiry_warning_days * 86400_000).toISOString().slice(0, 10);
     const rows = ctx.db
       .prepare(
-        `SELECT l.id AS lot_id, p.name, p.category, l.quantity, l.unit, l.expires_on, loc.name AS location
+        `SELECT l.id AS lot_id, p.name, COALESCE(hc.category, 'food') AS category, l.quantity, l.unit, l.expires_on, loc.name AS location
          FROM lots l JOIN products p ON p.id = l.product_id JOIN locations loc ON loc.id = l.location_id
+         LEFT JOIN household_product_categories hc ON hc.household_id = l.household_id AND hc.product_id = l.product_id
          WHERE l.household_id = ? AND l.expires_on IS NOT NULL AND l.expires_on <= ?
          ORDER BY l.expires_on, p.name`,
       )
@@ -120,9 +121,23 @@ export async function runAlertCheck(ctx: Ctx): Promise<{ households: number; ale
   return { households: households.length, alerted };
 }
 
+// Offline retries only matter for a short while, so the record that makes a replayed change a no-op is kept 30 days.
+// Runs at most once a day; deletes by a full scan, which is cheap at this size and avoids an index written on every change.
+export function pruneAppliedOps(ctx: Ctx, keepDays = 30): number {
+  const today = ctx.now().toISOString().slice(0, 10);
+  const last = ctx.db.prepare("SELECT value FROM settings WHERE key = 'applied_ops_pruned_on'").get() as { value: string } | undefined;
+  if (last?.value === today) return 0;
+  const cutoff = new Date(ctx.now().getTime() - keepDays * 86400_000).toISOString().replace(/\.\d{3}Z$/, "Z");
+  const removed = Number(ctx.db.prepare("DELETE FROM applied_ops WHERE created_at < ?").run(cutoff).changes);
+  ctx.db.prepare("INSERT OR REPLACE INTO settings(key,value) VALUES ('applied_ops_pruned_on', ?)").run(today);
+  return removed;
+}
+
 // Periodic work shared by the Node timer below and the Worker's Durable Object alarm.
 export const runBackgroundChecks = (ctx: Ctx) =>
-  Promise.all([runAlertCheck(ctx), resolvePendingProducts(ctx)]).catch((e) => console.error("shelfie: background check failed", e));
+  Promise.all([runAlertCheck(ctx), resolvePendingProducts(ctx), Promise.resolve().then(() => pruneAppliedOps(ctx))]).catch((e) =>
+    console.error("shelfie: background check failed", e),
+  );
 
 export function startAlertScheduler(ctx: Ctx, everyMs = 5 * 60_000): NodeJS.Timeout {
   const tick = () => runBackgroundChecks(ctx);

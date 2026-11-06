@@ -35,6 +35,16 @@ function findLot(ctx: Ctx, hid: number, t: LotTarget): { id: number; quantity: n
   return undefined;
 }
 
+// Upsert that skips the write when nothing changes.
+export function setCategory(ctx: Ctx, hid: number, productId: number, category: string): void {
+  ctx.db
+    .prepare(
+      `INSERT INTO household_product_categories(household_id,product_id,category) VALUES (?,?,?)
+       ON CONFLICT(household_id,product_id) DO UPDATE SET category = excluded.category WHERE category <> excluded.category`,
+    )
+    .run(hid, productId, category);
+}
+
 export interface AddLotInput extends ProductInput {
   client_id?: string;
   category?: string;
@@ -52,8 +62,8 @@ export async function addLot(ctx: Ctx, hid: number, userId: number, input: AddLo
   const loc = ctx.db.prepare("SELECT id FROM locations WHERE id = ? AND household_id = ?").get(input.location_id, hid);
   if (!loc) throw new HttpError(400, "Unknown location");
   const productId = await resolveProduct(ctx, input);
-  // The category belongs to the product, so the last choice is what the next add pre-selects.
-  if (input.category) ctx.db.prepare("UPDATE products SET category = ? WHERE id = ? AND category <> ?").run(input.category, productId, input.category);
+  // The category is the household's own choice for this product, so the last choice is what the next add pre-selects.
+  if (input.category) setCategory(ctx, hid, productId, input.category);
   return ctx.db.transaction(() => {
     const again = seen(ctx, hid, input.client_id);
     if (again) return again;
@@ -172,9 +182,10 @@ export function listLots(ctx: Ctx, hid: number) {
   const rows = ctx.db
     .prepare(
       `SELECT l.id, l.client_id, l.location_id, loc.name AS location_name, loc.kind AS location_kind,
-              l.product_id, p.name, p.brand, p.image_url, p.barcode, p.resolved, p.category,
+              l.product_id, p.name, p.brand, p.image_url, p.barcode, p.resolved, COALESCE(hc.category, 'food') AS category,
               l.quantity, l.unit, l.expires_on, l.purchased_on, l.notes, l.created_at
        FROM lots l JOIN products p ON p.id = l.product_id JOIN locations loc ON loc.id = l.location_id
+       LEFT JOIN household_product_categories hc ON hc.household_id = l.household_id AND hc.product_id = l.product_id
        WHERE l.household_id = ?
        ORDER BY l.expires_on IS NULL, l.expires_on, p.name`,
     )
